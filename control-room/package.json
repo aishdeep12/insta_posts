@@ -1,0 +1,17 @@
+{
+  "name": "agent-control-room",
+  "version": "1.0.0",
+  "description": "Multi-level agent control room: Root Master, domain Masters, sub-agents. Swap the model underneath with one env var.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "sharp": ">=0.33.5"
+  },
+  "license": "MIT"
+}

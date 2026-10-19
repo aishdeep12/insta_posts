@@ -1,0 +1,1437 @@
+<title>Aishdeep's Control Room</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two columns. Left = constellation (hub and spoke, Master in the middle) + live event log.
+   Right = mission console (Scout > Pick > Make > Review > Post) + crew registry.
+   One committed dark look: ink background, one hue per agent. */
+:root{
+  --ink:#060812; --panel:#0B1020; --raise:#121A31;
+  --line:rgba(132,160,255,.18); --edge:rgba(140,200,255,.6);
+  --text:#E7ECFF; --dim:#9AA4C6; --mute:#7C87AE;
+  --master:#FFB547; --scout:#5CC8FF; --maker:#FF6B9D; --poster:#5EEAD4;
+  --ok:#7CE38B; --warn:#FFD166; --bad:#FF7A7A;
+  --display:"Chakra Petch",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--text);font:400 14px/1.55 var(--body);min-height:100%}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(900px 520px at 80% -10%,rgba(92,200,255,.11),transparent 60%),
+    radial-gradient(760px 520px at 0% 110%,rgba(255,107,157,.08),transparent 60%),
+    linear-gradient(rgba(132,160,255,.05) 1px,transparent 1px) 0 0/44px 44px,
+    linear-gradient(90deg,rgba(132,160,255,.05) 1px,transparent 1px) 0 0/44px 44px}
+.shell{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding-block:20px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px}
+button,input,textarea{font:inherit;color:inherit}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand h1{margin:0;font:700 20px/1.1 var(--display);letter-spacing:.14em;text-transform:uppercase;overflow-wrap:anywhere}
+.brand small{display:block;margin-top:3px;font:500 11px var(--mono);color:var(--dim);letter-spacing:.08em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border:1px solid var(--line);background:rgba(11,16,32,.7);
+  font:500 11px var(--mono);letter-spacing:.06em;color:var(--dim)}
+.chip i{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.chip b{color:var(--text);font-weight:500}
+
+/* tabs */
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tab{padding:9px 16px;border:1px solid var(--line);background:transparent;cursor:pointer;
+  font:600 12px var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.tab[aria-selected="true"]{color:var(--ink);background:var(--text);border-color:var(--text)}
+
+/* layout */
+.deck{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px;align-items:start}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (max-width:1020px){.deck{grid-template-columns:minmax(0,1fr)}}
+
+/* panels with corner brackets */
+.panel{position:relative;min-width:0;padding:16px 18px 18px;border:1px solid var(--line);border-radius:3px;
+  background:linear-gradient(180deg,rgba(20,28,52,.74),rgba(11,16,32,.86))}
+.panel::before,.panel::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--edge);pointer-events:none}
+.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;
+  font:600 12px var(--display);letter-spacing:.2em;text-transform:uppercase;color:var(--dim)}
+.ph small{font:400 11px var(--mono);letter-spacing:.04em;text-transform:none;color:var(--mute);text-align:right}
+.lbl{display:block;margin-bottom:6px;font:600 11px var(--display);letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.hint{font-size:12px;color:var(--mute)}
+
+/* controls */
+.btn{--c:var(--master);padding:11px 18px;border:1px solid var(--c);cursor:pointer;
+  font:600 12px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--c);
+  background:color-mix(in srgb,var(--c) 10%,transparent);
+  clip-path:polygon(9px 0,100% 0,100% calc(100% - 9px),calc(100% - 9px) 100%,0 100%,0 9px);transition:background .15s}
+.btn:hover:not(:disabled){background:color-mix(in srgb,var(--c) 22%,transparent)}
+.btn.primary{background:var(--c);color:#050711}
+.btn.primary:hover:not(:disabled){background:color-mix(in srgb,var(--c) 82%,#fff)}
+.btn.ghost{--c:var(--dim);border-color:var(--line)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:focus-visible{outline:0;box-shadow:inset 0 0 0 2px var(--text)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin-top:12px}
+input[type=text],input[type=datetime-local],textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:2px;
+  background:rgba(4,6,14,.75);font:400 13px/1.5 var(--mono);color:var(--text);resize:vertical}
+input:focus,textarea:focus{outline:0;border-color:var(--scout);box-shadow:0 0 0 1px var(--scout)}
+textarea:disabled{opacity:.55}
+
+/* constellation */
+#net{display:block;width:100%;height:auto;max-height:640px}
+.ring-bg{fill:none;stroke:rgba(132,160,255,.12);stroke-dasharray:2 7}
+.spoke{stroke:var(--c);stroke-opacity:.35;stroke-width:1.4}
+.sweep{transform-box:view-box;transform-origin:400px 320px;animation:spin 16s linear infinite}
+.node{--c:var(--master);cursor:pointer;transform-box:fill-box;transform-origin:center}
+.node.enter{animation:enter .6s cubic-bezier(.2,.8,.2,1) both}
+.node .halo{fill:var(--c);opacity:.08}
+.node .core{fill:#0A0F20;stroke:var(--c);stroke-width:1.6}
+.node .ring{fill:none;stroke:var(--c);stroke-width:1.3;stroke-dasharray:3 9;opacity:.65;transform-box:fill-box;transform-origin:center;animation:spin 26s linear infinite}
+.node .glyph{fill:none;stroke:var(--c);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.node .nlabel{fill:var(--text);font:700 17px var(--display);letter-spacing:.14em;text-anchor:middle;text-transform:uppercase}
+.node .nrole{fill:var(--mute);font:500 12px var(--mono);letter-spacing:.06em;text-anchor:middle}
+.node .dot{fill:var(--ok)}
+.node[data-status=working]{filter:drop-shadow(0 0 14px var(--c))}
+.node[data-status=working] .ring{animation-duration:3s;opacity:1}
+.node[data-status=working] .halo{animation:pulse 1.3s ease-in-out infinite}
+.node[data-status=working] .dot{fill:var(--c)}
+.node[data-status=waiting] .dot{fill:var(--warn);animation:blink 1s steps(2) infinite}
+.node.sel .core{stroke-width:2.6}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{opacity:.22}}
+@keyframes blink{50%{opacity:.15}}
+@keyframes enter{from{opacity:0;transform:scale(.3)}}
+@media (max-width:640px){.node .nlabel{font-size:26px}.node .nrole{display:none}}
+.sel{display:grid;gap:4px;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--c,var(--master));background:rgba(4,6,14,.5);font-size:13px}
+.sel b{font:700 13px var(--display);letter-spacing:.14em;text-transform:uppercase}
+.sel p{margin:0;color:var(--dim)}
+
+/* tags */
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{display:inline-flex;align-items:baseline;gap:6px;padding:2px 8px;border:1px solid var(--line);font:400 11px var(--mono);color:var(--dim)}
+.tag small{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.tag.broad small{color:var(--warn)}.tag.niche small{color:var(--scout)}.tag.intent small{color:var(--poster)}.tag.local small{color:var(--maker)}
+
+/* event log */
+.log{height:240px;overflow:auto;padding:10px 12px;border:1px solid var(--line);background:rgba(4,6,14,.7);font:400 12px/1.65 var(--mono)}
+.log div{display:flex;flex-wrap:wrap;gap:0 8px}
+.log .t{color:var(--mute)}
+.log .who{color:var(--c);font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.log .ar{color:var(--mute)}
+.log .lm{color:var(--text);min-width:0;overflow-wrap:anywhere}
+
+/* mission rail */
+.rail{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 16px;padding:0;list-style:none}
+.rail li{--c:var(--dim);display:flex;flex-direction:column;gap:2px;padding:7px 8px;border:1px solid var(--line);border-top:2px solid var(--line);opacity:.6}
+.rail b{font:500 10px var(--mono);color:var(--mute)}
+.rail span{font:600 11px var(--display);letter-spacing:.12em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis}
+.rail li.active{opacity:1;border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 28%,transparent)}
+.rail li.active b,.rail li.done b{color:var(--c)}
+.rail li.done{opacity:1;border-top-color:var(--c)}
+.steps{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:5px;font:400 12px var(--mono);color:var(--dim)}
+.steps li::before{content:"› ";color:var(--scout)}
+.steps li.done::before{content:"✓ ";color:var(--ok)}
+.src{margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);font-size:12px;color:var(--dim)}
+.src ul{margin:6px 0 0;padding:0;list-style:none;display:grid;gap:3px}
+a{color:var(--scout);text-underline-offset:3px}
+
+/* topic cards */
+.topics{display:grid;gap:8px;margin:0}
+.topic{display:grid;grid-template-columns:18px minmax(0,1fr);gap:12px;padding:12px;border:1px solid var(--line);cursor:pointer;background:rgba(4,6,14,.4)}
+.topic:hover{border-color:rgba(92,200,255,.5)}
+.topic.on{border-color:var(--scout);background:color-mix(in srgb,var(--scout) 9%,transparent);box-shadow:0 0 0 1px var(--scout)}
+.topic input{margin:4px 0 0;accent-color:var(--scout)}
+.topic b{display:block;font:600 15px/1.3 var(--display);letter-spacing:.02em}
+.topic p{margin:4px 0 8px;font-size:12.5px;color:var(--dim)}
+.topic .meta{margin-top:8px;font:400 11px var(--mono);color:var(--mute);display:flex;flex-wrap:wrap;gap:4px 12px}
+.banner{display:flex;align-items:center;gap:10px;margin-top:12px;padding:9px 12px;border:1px solid color-mix(in srgb,var(--master) 55%,transparent);background:color-mix(in srgb,var(--master) 8%,transparent);font-size:12.5px}
+.banner i{width:8px;height:8px;background:var(--master);animation:blink 1s steps(2) infinite;flex:none}
+
+/* slide previews */
+.reel{display:flex;gap:10px;overflow-x:auto;padding:2px 0 10px;scroll-snap-type:x proximity}
+.slide{--c:var(--scout);flex:0 0 min(44%,184px);aspect-ratio:4/5;container-type:inline-size;position:relative;overflow:hidden;scroll-snap-align:start;
+  border:1px solid var(--line);background:radial-gradient(circle at 100% 0,color-mix(in srgb,var(--c) 32%,transparent),transparent 58%),var(--ink)}
+.si{position:absolute;inset:0;padding:8cqw 9cqw;display:flex;flex-direction:column;justify-content:center;gap:3cqw}
+.si .br{position:absolute;top:7cqw;left:9cqw;font:700 5.4cqw var(--display);letter-spacing:.18em;color:var(--text)}
+.si .n{font:700 25cqw/1 var(--display);color:var(--c)}
+.si .lb{font:500 5.6cqw var(--mono);color:var(--dim);overflow-wrap:anywhere}
+.si h4{margin:0;font:700 10.6cqw/1.08 var(--display);overflow-wrap:anywhere}
+.si p{margin:0;font-size:6.1cqw;line-height:1.4;color:var(--dim)}
+.slide.cover .si h4{font-size:13.5cqw;color:var(--text)}
+.slide.cover .si h4 span{color:var(--c)}
+
+/* review + checks */
+.field{margin-top:12px}
+.checks{margin:12px 0 0;padding:0;list-style:none;display:grid;gap:4px;font:400 12px var(--mono)}
+.checks li{display:flex;gap:8px;color:var(--dim)}
+.checks li::before{content:"✓";color:var(--ok)}
+.checks li.bad{color:var(--text)}
+.checks li.bad::before{content:"✕";color:var(--bad)}
+.radios{display:flex;flex-wrap:wrap;gap:8px}
+.radios label{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);cursor:pointer;font:600 11px var(--display);letter-spacing:.12em;text-transform:uppercase}
+.radios label:has(input:checked){border-color:var(--poster);color:var(--poster);background:color-mix(in srgb,var(--poster) 9%,transparent)}
+.radios input{accent-color:var(--poster)}
+.pkg{margin-top:14px;display:grid;gap:10px}
+pre{margin:0;padding:12px;overflow:auto;max-height:260px;border:1px solid var(--line);background:rgba(4,6,14,.75);font:400 11.5px/1.55 var(--mono);color:var(--text)}
+.done-chip{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--poster);color:var(--poster);font:600 11px var(--display);letter-spacing:.14em;text-transform:uppercase}
+
+/* crew registry */
+.crewlist{margin:0;padding:0;list-style:none;display:grid;gap:8px}
+.crew{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:12px;padding:10px 12px;border:1px solid var(--line);border-left:3px solid var(--c);background:rgba(4,6,14,.4)}
+.crew .sw{width:10px;height:10px;margin-top:6px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.crew b{font:700 13px var(--display);letter-spacing:.14em;text-transform:uppercase}
+.crew em{margin-left:8px;font:400 11px var(--mono);font-style:normal;color:var(--mute)}
+.crew p{margin:3px 0 6px;font-size:12.5px;color:var(--dim)}
+.crew .st{font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ok);white-space:nowrap}
+.crew[data-status=working] .st{color:var(--c)}.crew[data-status=waiting] .st{color:var(--warn)}
+.crew button.rm{margin-top:6px;padding:0;border:0;background:none;cursor:pointer;font:400 11px var(--mono);color:var(--mute);text-decoration:underline}
+.sub{margin:18px 0 8px;padding-top:14px;border-top:1px dashed var(--line);font:600 11px var(--display);letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+.form{display:grid;gap:10px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+@media (max-width:560px){.two{grid-template-columns:minmax(0,1fr)}.rail span{font-size:9px;letter-spacing:.06em}}
+.ex{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ex button{padding:4px 9px;border:1px solid var(--line);background:none;cursor:pointer;font:400 11px var(--mono);color:var(--dim)}
+.ex button:hover{border-color:var(--master);color:var(--text)}
+.bars{display:grid;gap:5px;margin-top:10px;font:400 11px var(--mono)}
+.bar{display:grid;grid-template-columns:96px minmax(0,1fr) 44px;gap:8px;align-items:center;color:var(--dim)}
+.bar i{display:block;height:6px;background:var(--line)}
+.bar i s{display:block;height:100%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.verdict{margin-top:10px;padding:9px 12px;border:1px solid var(--line);font-size:12.5px}
+
+/* agent chat */
+.chat{display:flex;flex-direction:column;gap:10px}
+.msgs{height:270px;overflow:auto;padding:10px 12px;border:1px solid var(--line);background:rgba(4,6,14,.7);display:flex;flex-direction:column;gap:10px}
+.msg{max-width:90%;padding:8px 11px;border:1px solid var(--line);font-size:13px}
+.msg b{display:block;margin-bottom:2px;font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--c,var(--dim))}
+.msg p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.you{align-self:flex-end;border-color:var(--text)}
+.msg.agent{align-self:flex-start;border-left:3px solid var(--c)}
+.msg.busy p{color:var(--mute)}
+.sr{position:absolute;left:-9999px}
+/* hierarchy */
+.crew{margin-left:calc(var(--d,0) * 14px)}
+.msg.peer{align-self:stretch;border-style:dashed;background:rgba(132,160,255,.05)}
+select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:2px;background:rgba(4,6,14,.75);font:400 13px var(--mono);color:var(--text)}
+select:focus{outline:0;border-color:var(--scout);box-shadow:0 0 0 1px var(--scout)}
+/* blueprint */
+.bp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media (max-width:1020px){.bp{grid-template-columns:minmax(0,1fr)}}
+.bp h3{margin:0 0 8px;font:600 14px var(--display);letter-spacing:.1em;text-transform:uppercase}
+.bp p,.bp li{color:var(--dim);font-size:13.5px}
+.bp ul,.bp ol{margin:8px 0 0;padding-left:20px;display:grid;gap:4px}
+.wide{grid-column:1/-1}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top;color:var(--dim)}
+th{font:600 11px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--text)}
+td:first-child{color:var(--text);font-weight:600}
+.pill{display:inline-block;padding:1px 8px;border:1px solid var(--line);font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.pill.live{color:var(--ok);border-color:var(--ok)}.pill.back{color:var(--warn);border-color:var(--warn)}
+
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:20;padding:9px 16px;
+  border:1px solid var(--text);background:var(--ink);font:500 12px var(--mono);opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" width="38" height="38" aria-hidden="true"><path d="M20 3l14 8v18l-14 8-14-8V11z" fill="none" stroke="#FFB547" stroke-width="2"/><path d="M20 12l7 4v8l-7 4-7-4v-8z" fill="#FFB547" fill-opacity=".25" stroke="#FFB547" stroke-width="1.5"/><circle cx="20" cy="20" r="2.5" fill="#FFB547"/></svg>
+      <div><h1>Aishdeep's Control Room</h1><small>ROOT · DOMAINS · AGENTS</small></div>
+    </div>
+    <div class="chips">
+      <span class="chip"><i></i><b id="c-agents">5</b>&nbsp;agents · <b id="c-domains">1</b>&nbsp;domains</span>
+      <span class="chip" id="c-model" hidden title="The model behind every agent">model <b id="c-model-t"></b></span>
+      <span class="chip" id="c-stage">Mission: idle</span>
+      <span class="chip" title="America/Toronto"><b id="clock">--:--:--</b>&nbsp;Toronto</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button class="tab" role="tab" id="tab-control" aria-selected="true" aria-controls="view-control">Control room</button>
+    <button class="tab" role="tab" id="tab-blueprint" aria-selected="false" aria-controls="view-blueprint">Blueprint</button>
+  </nav>
+
+  <main id="view-control" role="tabpanel" aria-labelledby="tab-control">
+    <div class="deck">
+      <div class="col">
+        <section class="panel">
+          <div class="ph">Organization <small>Root, domain Masters, sub-agents</small></div>
+          <svg id="net" viewBox="-400 -300 800 640" role="img" aria-label="Map of the agent organization. Root Master in the middle, domain Masters around it, each with its own sub-agents."></svg>
+          <div class="sel" id="sel"></div>
+        </section>
+        <section class="panel" id="chatpanel" style="--c:var(--text)">
+          <div class="ph"><span id="chat-title">Chat with Root Master</span><small>click any agent to switch</small></div>
+          <div class="chat">
+            <div class="msgs" id="msgs" role="log" aria-live="polite" tabindex="0"></div>
+            <div id="cfg-box"></div>
+            <div class="ex" id="chat-ex" style="margin-top:0"></div>
+            <form class="row" id="chat-form" autocomplete="off" style="margin-top:0">
+              <label class="sr" for="chat-in">Message</label>
+              <input type="text" id="chat-in" style="flex:1 1 200px;width:auto" placeholder="Type to this agent" maxlength="600">
+              <button class="btn primary" id="chat-go" type="submit" style="--c:var(--scout)">Send</button>
+            </form>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="ph">Event log <small>every message between agents</small></div>
+          <div class="log" id="log" role="log" aria-live="off" tabindex="0"></div>
+        </section>
+      </div>
+      <div class="col">
+        <section class="panel">
+          <div class="ph">Social domain mission <small id="m-sub">Scout finds topics, you pick one</small></div>
+          <ol class="rail" id="rail"></ol>
+          <div id="mission-body"></div>
+        </section>
+        <section class="panel">
+          <div class="ph">Organization registry <small>who reports to whom</small></div>
+          <ul class="crewlist" id="crew"></ul>
+
+          <div class="sub">Give Root Master a task</div>
+          <form class="form" id="route" autocomplete="off">
+            <label class="lbl" for="r-task">Task in plain words</label>
+            <div class="row" style="margin-top:0">
+              <input type="text" id="r-task" placeholder="e.g. design a carousel about agents" style="flex:1 1 220px;width:auto">
+              <button class="btn" style="--c:var(--master)" type="submit">Route</button>
+            </div>
+          </form>
+          <div class="ex" id="r-ex"></div>
+          <div id="r-out"></div>
+
+          <div class="sub">Create a domain</div>
+          <form class="form" id="dom" autocomplete="off">
+            <div><label class="lbl" for="d-name">Domain name</label><input type="text" id="d-name" placeholder="Job Search" maxlength="24" required></div>
+            <div><label class="lbl" for="d-spec">What this domain does</label><textarea id="d-spec" rows="2" placeholder="Finds roles, tailors my resume for each one and tracks applications" required></textarea></div>
+            <div class="row" style="margin-top:0"><button class="btn primary" style="--c:var(--master)" type="submit" id="d-go">Create domain</button><span class="hint">Root Master creates a domain Master and proposes its team.</span></div>
+          </form>
+
+          <div class="sub">Add an agent to a Master</div>
+          <form class="form" id="add" autocomplete="off">
+            <div class="two">
+              <div><label class="lbl" for="a-parent">Reports to</label><select id="a-parent"></select></div>
+              <div><label class="lbl" for="a-name">Name</label><input type="text" id="a-name" placeholder="Translator" maxlength="24" required></div>
+            </div>
+            <div><label class="lbl" for="a-spec">Speciality</label><textarea id="a-spec" rows="2" placeholder="Translates captions and slide text into French and Spanish" required></textarea></div>
+            <div><label class="lbl" for="a-handles">Keywords (optional)</label><input type="text" id="a-handles" placeholder="translate, french, spanish"></div>
+            <div class="row" style="margin-top:0"><button class="btn primary" style="--c:var(--master)" type="submit" id="a-go">Register agent</button><span class="hint">Its Master works out what to hand it.</span></div>
+          </form>
+
+          <div id="code-panel" hidden>
+            <div class="sub">Integrate your code</div>
+            <form class="form" id="code-form" autocomplete="off">
+              <div class="two">
+                <div><label class="lbl" for="i-parent">Reports to</label><select id="i-parent"></select></div>
+                <div><label class="lbl" for="i-name">Name (optional)</label><input type="text" id="i-name" placeholder="Resume parser" maxlength="24"></div>
+              </div>
+              <div><label class="lbl" for="i-instr">Instructions for Master</label><textarea id="i-instr" rows="2" placeholder="Takes a job post and prints the 5 key requirements" required></textarea></div>
+              <div><label class="lbl" for="i-code">Code (Python or Node)</label><textarea id="i-code" rows="6" placeholder="Paste a script, or choose a file below. It reads JSON from stdin and prints its result." required></textarea></div>
+              <div class="row" style="margin-top:0"><input type="file" id="i-file" accept=".py,.js,.mjs,.txt" style="width:auto;flex:1 1 180px"><label class="hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="i-adapt"> Let Master adapt it to the stdin/stdout contract</label></div>
+              <div class="row" style="margin-top:0"><button class="btn primary" style="--c:var(--master)" type="submit" id="i-go">Hand to Master</button><span class="hint">Added as pending. It never runs until you approve it.</span></div>
+            </form>
+            <div id="code-review"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <section id="view-blueprint" role="tabpanel" aria-labelledby="tab-blueprint" hidden>
+    <div class="bp">
+      <div class="panel">
+        <div class="ph">Structure</div>
+<pre>Root Master
+├─ Social Master          (domain)
+│  ├─ Trend Scout
+│  ├─ Maker
+│  └─ Poster
+├─ Job Search Master      (you create it)
+│  └─ sub-agents it proposes
+└─ any other domain Master</pre>
+        <p>Root Master knows every domain and creates new ones. Each domain Master runs its own team and its own work. Masters can message each other directly. A sub-agent only talks inside its own domain.</p>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Creating a domain</div>
+        <ol>
+          <li>You describe the work in your own words, in the form or in a chat with Root Master.</li>
+          <li>Root Master creates a domain Master and writes its registry record: role, keywords, what it takes, what it returns.</li>
+          <li>It proposes two or three sub-agents that cover the domain, and registers them under the new Master.</li>
+          <li>From then on Root Master routes any matching task to that domain, and the domain Master routes it to the right sub-agent.</li>
+        </ol>
+        <p>A Master can add more sub-agents later from its own chat, or from Add an agent.</p>
+      </div>
+
+      <div class="panel">
+        <div class="ph">What a chat can do</div>
+        <ul>
+          <li><b>Root Master:</b> the entry route for system-wide changes: create a domain, remove or edit any agent, propose configuration changes (you approve them), route a task, message any Master.</li>
+          <li><b>Domain Masters:</b> add, edit or remove agents in their own team, delegate a task, message other Masters. They cannot remove or edit each other. Social Master can also start the Instagram mission.</li>
+          <li><b>Sub-agents:</b> answer within their speciality and message their own Master or teammates. Scout, Maker and Poster can also change the brief, caption, hashtags and timing.</li>
+        </ul>
+        <p>Messages between agents show in the event log and in both agents' chats.</p>
+      </div>
+
+      <div class="panel">
+        <div class="ph">Message between Masters</div>
+<pre>{
+  "id": "msg_0142",
+  "from": "research-master",
+  "to": "social-master",
+  "type": "request",
+  "text": "Send me three topics for this week's carousel",
+  "needs_approval": false
+}</pre>
+        <p>Messages travel along the tree, so a note from a sub-agent to another domain goes up to its Master, across to the other Master, then down.</p>
+      </div>
+
+      <div class="panel wide">
+        <div class="ph">What is live in this page, and what needs a backend</div>
+        <div class="scroll"><table>
+          <thead><tr><th>Piece</th><th>Status here</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Domains, sub-agents, registry, routing</td><td><span class="pill live">works</span></td><td>Created from your descriptions by the model and saved in this browser.</td></tr>
+            <tr><td>Chat with any agent, delegation, Master to Master messages</td><td><span class="pill live">works</span></td><td>Each agent is a call to your model with its own role. The result is text: a plan, a draft, an answer. Code agents run your approved scripts.</td></tr>
+            <tr><td>Social mission: topics, draft, checks, package</td><td><span class="pill live">works</span></td><td>Scout searches the web when SEARCH_PROVIDER is set in .env. Otherwise it uses the built-in Oct 19, 2026 sweep.</td></tr>
+            <tr><td>Saving the approved package</td><td><span class="pill live">works</span></td><td>Saved to data/db.json on this machine.</td></tr>
+            <tr><td>Making PNGs, pushing to GitHub, publishing</td><td><span class="pill live">server</span></td><td>The server renders the PNGs, pushes them to your GitHub clone and publishes with the Instagram Graph API. It starts in dry-run mode and needs your token in .env. Not yet tested against a live account.</td></tr>
+            <tr><td>Agents that work on their own in the background</td><td><span class="pill back">needs a backend</span></td><td>Agents only act while this page is open. A small server would run domains on a schedule.</td></tr>
+          </tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="/shim.js"></script>
+<script>
+(() => {
+'use strict';
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const TZ = 'America/Toronto';
+const timeFmt = new Intl.DateTimeFormat('en-GB', {timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23'});
+const dateFmt = new Intl.DateTimeFormat('en-CA', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'});
+const stampFmt = new Intl.DateTimeFormat('sv-SE', {timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
+
+/* ---------- data ---------- */
+let SWEEP_DATE = 'Oct 19, 2026';
+const SWEEP = [
+  {src: 'Mean CEO, AI Trends (startup edition)', url: 'https://blog.mean.ceo/?p=10983', date: 'Oct 2, 2026', points: [
+    'Persistent AI agents continue a task over hours or days, prepare work and wait for approval',
+    'Agent-ready open-weight models give more control over hosting and data handling',
+    'Agentic business automation: sales research, support triage, reporting',
+    'Workflow first: build one supervised AI workflow before buying more tools',
+    '30-day test: trial one weekly task and track time, errors, human edits, customer effect and direct cost']},
+  {src: 'Mean CEO, AI Agents News', url: 'https://blog.mean.ceo/?p=11051', date: 'Oct 8, 2026', points: [
+    'Agents are moving from demos into daily business operations',
+    'Start with one costly workflow, limited system access and a human review step']},
+  {src: 'Inro, Instagram SEO guide 2026', url: 'https://www.inro.social/blog/instagram-seo-guide-2026', date: '2026', points: [
+    'Put the searchable phrase in the first line of the caption, it works like a headline',
+    'Name field and bio keywords are weighted',
+    'Alt text: describe first, keyword second',
+    'Saves and shares count for more than likes',
+    'Public posts from professional accounts can appear in Google results']},
+  {src: 'Metricool, Instagram SEO', url: 'https://metricool.com/instagram-seo/', date: 'Jun 2026', points: [
+    'Use 3 to 5 hashtags that match the caption keywords',
+    'Reels: keywords in on-screen text and on the cover',
+    'Keyword types: broad, niche, local, intent',
+    'Check the opening lines of top posts in your niche for their wording']}
+];
+const sigCount = () => SWEEP.reduce((n, s) => n + s.points.length, 0);
+
+const TOPICS = [
+  {title: 'Build one supervised AI workflow first', why: 'The October edition says to build one supervised workflow before buying more AI tools.',
+   keywords: [{k: 'ai workflow automation', type: 'niche'}, {k: 'ai agents for small business', type: 'niche'}, {k: 'how to automate a task with ai', type: 'intent'}], sources: [1, 0],
+   points: [{h: 'Pick one costly task', b: 'Start with the weekly job that eats the most time.'}, {h: 'Limit what it can touch', b: 'Give the agent narrow access first and widen it later.'}, {h: 'Keep a human review step', b: 'The agent prepares the work and waits for approval.'}]},
+  {title: 'Agents that prepare work, then wait for you', why: 'Persistent agents keep working for hours or days and hold the result for approval.',
+   keywords: [{k: 'persistent ai agents', type: 'niche'}, {k: 'agentic workflow', type: 'niche'}, {k: 'what is an ai agent', type: 'intent'}], sources: [0],
+   points: [{h: 'Runs for hours or days', b: 'The agent keeps going on a task without new prompts.'}, {h: 'Prepares, never publishes', b: 'Output lands in a queue for your review.'}, {h: 'You approve the last step', b: 'A person signs off before anything goes live.'}]},
+  {title: 'Open-weight models for your agents', why: 'Agent-ready open-weight models offer more control over hosting and data handling.',
+   keywords: [{k: 'open weight models', type: 'broad'}, {k: 'self hosted llm', type: 'niche'}, {k: 'should i self host an llm', type: 'intent'}], sources: [0],
+   points: [{h: 'More control', b: 'You choose where the model runs and where the data goes.'}, {h: 'More to maintain', b: 'Hosting, updates and monitoring become your job.'}, {h: 'Prove it first', b: 'Get the workflow working, then decide on hosting.'}]},
+  {title: 'Instagram SEO: keywords before hashtags', why: 'Both SEO guides put the keyword in the first line and recommend a few matching hashtags.',
+   keywords: [{k: 'instagram seo', type: 'broad'}, {k: 'instagram keywords', type: 'niche'}, {k: 'how to rank on instagram search', type: 'intent'}], sources: [2, 3],
+   points: [{h: 'Keyword in line one', b: 'The first sentence of the caption works like a headline.'}, {h: 'Describe, then keyword', b: 'Alt text describes the image first and adds a keyword second.'}, {h: '3 to 5 matching tags', b: 'Use hashtags that repeat your caption keywords.'}]},
+  {title: 'Test one AI workflow for 30 days', why: 'Trial one weekly task and track time, errors, human edits, customer effect and direct cost.',
+   keywords: [{k: 'ai workflow test', type: 'niche'}, {k: 'ai roi small business', type: 'niche'}, {k: 'how to measure ai results', type: 'intent'}], sources: [0],
+   points: [{h: 'Pick one weekly task', b: 'Small enough to finish and repeated enough to measure.'}, {h: 'Track five numbers', b: 'Time, errors, human edits, customer effect, direct cost.'}, {h: 'Decide at day 30', b: 'Keep it, change it or drop it based on the numbers.'}]}
+];
+
+const PALETTE = ['#B79CFF', '#9BE564', '#FF9F6B', '#6BE0FF', '#FFD6A5', '#F78BFF', '#FF8A8A', '#8AF0C9'];
+const BASE = [
+  {id: 'root', name: 'Root Master', role: 'Chief orchestrator', kind: 'root', parent: null, color: 'var(--text)', builtin: true,
+   speciality: 'Knows every domain. Creates new domain Masters, routes your requests to the right one and lets Masters talk to each other.',
+   handles: ['domain', 'create', 'master', 'organize', 'plan', 'coordinate', 'delegate', 'team']},
+  {id: 'master', name: 'Social Master', role: 'Domain: Social', kind: 'master', parent: 'root', color: 'var(--master)', builtin: true,
+   speciality: 'Runs the Instagram content pipeline: trends, slides, captions and publishing. Leads Trend Scout, Maker and Poster.',
+   handles: ['social', 'instagram', 'content', 'mission', 'approve', 'register']},
+  {id: 'scout', name: 'Trend Scout', role: 'Research', kind: 'worker', parent: 'master', color: 'var(--scout)', builtin: true,
+   speciality: 'Scans for current trends, topics and SEO keywords, then asks you which topic to post.',
+   handles: ['trend', 'topic', 'keyword', 'seo', 'research', 'scan', 'news', 'search', 'idea']},
+  {id: 'maker', name: 'Maker', role: 'Creative', kind: 'worker', parent: 'master', color: 'var(--maker)', builtin: true,
+   speciality: 'Builds the slides, caption, hashtags and alt text for a post.',
+   handles: ['image', 'slide', 'caption', 'design', 'carousel', 'copy', 'write', 'hashtag', 'graphic']},
+  {id: 'poster', name: 'Poster', role: 'Publishing', kind: 'worker', parent: 'master', color: 'var(--poster)', builtin: true,
+   speciality: 'Prepares the approved post and publishes it through the server (Instagram Graph API).',
+   handles: ['post', 'publish', 'schedule', 'queue', 'draft', 'publora']}
+];
+const GLYPH = {
+  master: 'M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
+  scout: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7.5a4.5 4.5 0 1 0 4.5 4.5 M12 12L18 6',
+  maker: 'M12 3l9 5-9 5-9-5z M3 12.5l9 5 9-5 M3 16.5l9 5 9-5',
+  poster: 'M21 3L3 10.5l7 2.5 2.5 7z M10 13L21 3',
+  custom: 'M12 3l9 9-9 9-9-9z M12 8.5l3.5 3.5-3.5 3.5-3.5-3.5z',
+  root: 'M12 2l9 5v10l-9 5-9-5V7z M12 7l4.5 2.5v5L12 17l-4.5-2.5v-5z M12 11.2a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z'
+};
+
+/* ---------- state ---------- */
+let crew = BASE.map(a => ({...a, handles: [...a.handles]}));
+const status = {};
+const pos = {};
+let selected = 'root';
+const M = {stage: 0, niche: 'AI engineering, and AI agents for small businesses', topics: null, pick: null, draft: null, mode: '', busy: false, progress: [], pkg: null, timing: 'draft', when: '', n: 0};
+
+const byId = id => crew.find(a => a.id === id);
+const nameOf = id => id === 'you' ? 'You' : (byId(id) ? byId(id).name : id);
+const colorOf = id => id === 'you' ? 'var(--text)' : (byId(id) ? byId(id).color : 'var(--dim)');
+const kids = id => crew.filter(a => a.parent === id);
+const glyphOf = a => GLYPH[a.id] || (a.kind === 'master' ? GLYPH.master : GLYPH.custom);
+const RAD = a => a.kind === 'root' ? 46 : a.kind === 'master' ? 38 : 30;
+const chain = id => { const out = []; let a = byId(id); while (a) { out.push(a.id); a = a.parent ? byId(a.parent) : null; } return out; };
+const domainOf = id => { let a = byId(id); while (a && a.parent && a.parent !== 'root') a = byId(a.parent); return a; };
+const subtreeIds = id => [id, ...kids(id).flatMap(k => subtreeIds(k.id))];
+function pathBetween(a, b) {
+  const ca = chain(a), cb = chain(b);
+  const lca = ca.find(x => cb.includes(x));
+  if (!lca) return [];
+  return [...ca.slice(0, ca.indexOf(lca) + 1), ...cb.slice(0, cb.indexOf(lca)).reverse()];
+}
+
+/* ---------- toast ---------- */
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200);
+}
+
+/* ---------- event log ---------- */
+function log(from, msg, to) {
+  const box = $('#log');
+  const row = document.createElement('div');
+  row.innerHTML = `<span class="t">${timeFmt.format(new Date())}</span>` +
+    `<span class="who" style="--c:${colorOf(from)}">${esc(nameOf(from))}</span>` +
+    (to ? `<span class="ar">→</span><span class="who" style="--c:${colorOf(to)}">${esc(nameOf(to))}</span>` : '') +
+    `<span class="lm">${esc(msg)}</span>`;
+  box.appendChild(row);
+  while (box.children.length > 300) box.removeChild(box.firstChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- organization map ---------- */
+function layout() {
+  crew.forEach(a => { if (a.id !== 'root' && !byId(a.parent)) a.parent = 'root'; });
+  pos.root = {x: 0, y: 0};
+  const doms = kids('root'), n = Math.max(1, doms.length);
+  const r1 = n <= 1 ? 150 : Math.min(250, 120 + 34 * n);
+  const fan = (id, th, dist) => {
+    const ks = kids(id), m = ks.length, spread = Math.min(150, 50 * m);
+    ks.forEach((k, j) => {
+      const off = m === 1 ? 0 : -spread / 2 + j * spread / (m - 1), ang = th + off * Math.PI / 180;
+      pos[k.id] = {x: pos[id].x + Math.cos(ang) * dist, y: pos[id].y + Math.sin(ang) * dist};
+      fan(k.id, ang, dist * .82);
+    });
+  };
+  doms.forEach((d, i) => {
+    const th = (-90 + i * 360 / n) * Math.PI / 180;
+    pos[d.id] = {x: Math.cos(th) * r1, y: Math.sin(th) * r1};
+    fan(d.id, th, 158);
+  });
+}
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function renderNet(enterId) {
+  layout();
+  const svg = $('#net'); svg.textContent = '';
+  const xs = crew.map(a => pos[a.id].x), ys = crew.map(a => pos[a.id].y);
+  let x0 = Math.min(...xs) - 120, x1 = Math.max(...xs) + 120;
+  const y0 = Math.min(...ys) - 80, y1 = Math.max(...ys) + 120;
+  if (x1 - x0 < 640) { const mid = (x0 + x1) / 2; x0 = mid - 320; x1 = mid + 320; }
+  svg.setAttribute('viewBox', `${x0} ${y0} ${x1 - x0} ${y1 - y0}`);
+  const R0 = Math.max(...crew.map(a => Math.hypot(pos[a.id].x, pos[a.id].y))) + 40;
+  const bg = el('g', {}, svg);
+  [.4, .7, 1].forEach(k => el('circle', {cx: 0, cy: 0, r: R0 * k, class: 'ring-bg'}, bg));
+  const sw = el('g', {}, bg);
+  const ang = Math.PI / 4.5;
+  el('path', {d: `M0 0 L0 ${-R0} A${R0} ${R0} 0 0 1 ${R0 * Math.sin(ang)} ${-R0 * Math.cos(ang)} Z`, fill: 'rgba(92,200,255,.06)'}, sw);
+  el('line', {x1: 0, y1: 0, x2: 0, y2: -R0, stroke: 'rgba(92,200,255,.45)', 'stroke-width': 1}, sw);
+  if (!reduce) { const an = el('animateTransform', {attributeName: 'transform', type: 'rotate', from: '0 0 0', to: '360 0 0', dur: '18s', repeatCount: 'indefinite'}, sw); void an; }
+  crew.filter(a => a.id !== 'root').forEach(a => {
+    const p = pos[a.parent] || pos.root;
+    el('line', {x1: p.x, y1: p.y, x2: pos[a.id].x, y2: pos[a.id].y, class: 'spoke', style: `--c:${a.color}`}, svg);
+  });
+  el('g', {id: 'packets'}, svg);
+  crew.forEach(a => {
+    const R = RAD(a);
+    const outer = el('g', {transform: `translate(${pos[a.id].x} ${pos[a.id].y})`}, svg);
+    const g = el('g', {class: 'node' + (a.id === enterId ? ' enter' : '') + (a.id === selected ? ' sel' : ''), 'data-id': a.id, 'data-status': status[a.id] || 'idle',
+      style: `--c:${a.color}`, tabindex: 0, role: 'button', 'aria-label': `${a.name}, ${a.role}. ${status[a.id] || 'idle'}`}, outer);
+    el('circle', {class: 'halo', r: R + 16}, g);
+    el('circle', {class: 'ring', r: R + 8}, g);
+    el('circle', {class: 'core', r: R}, g);
+    const k = R / 26;
+    el('path', {class: 'glyph', d: glyphOf(a), transform: `translate(${-12 * k} ${-12 * k}) scale(${k})`}, g);
+    const lab = el('text', {class: 'nlabel', y: R + 26}, g); lab.textContent = a.name;
+    const rl = el('text', {class: 'nrole', y: R + 43}, g); rl.textContent = a.role;
+    el('circle', {class: 'dot', cx: R * .72, cy: -R * .72, r: 5}, g);
+    const pick = () => { selected = a.id; renderSel(); $$('.node').forEach(n => n.classList.toggle('sel', n.dataset.id === selected)); };
+    g.addEventListener('click', pick);
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+  });
+  renderSel();
+}
+function renderSel() {
+  const a = byId(selected) || byId('root'); selected = a.id;
+  const box = $('#sel'); box.style.setProperty('--c', a.color);
+  const team = kids(a.id);
+  box.innerHTML = `<b style="color:${a.color}">${esc(a.name)} · ${esc(a.role)}</b><p>${esc(a.speciality)}</p>` +
+    `<div class="tags">${a.handles.slice(0, 10).map(h => `<span class="tag">${esc(h)}</span>`).join('')}</div>` +
+    (a.parent ? `<p><span style="color:var(--mute)">reports to</span> ${esc(nameOf(a.parent))}</p>` : '') +
+    (team.length ? `<p><span style="color:var(--mute)">team</span> ${team.map(k => esc(k.name)).join(', ')}</p>` : '') +
+    (a.accepts ? `<p><span style="color:var(--mute)">takes</span> ${esc(a.accepts)}</p><p><span style="color:var(--mute)">returns</span> ${esc(a.returns || '')}</p>` : '');
+  renderChat();
+}
+function setStatus(id, s) {
+  status[id] = s;
+  const n = $(`.node[data-id="${id}"]`); if (n) n.dataset.status = s;
+  const r = $(`.crew[data-id="${id}"]`); if (r) { r.dataset.status = s; $('.st', r).textContent = s; }
+}
+function packet(from, to) {
+  return new Promise(res => {
+    const a = pos[from], b = pos[to], layer = $('#packets');
+    if (!a || !b || !layer || reduce) { res(); return; }
+    const col = colorOf(from);
+    const c = el('circle', {r: 6, style: `fill:${col};filter:drop-shadow(0 0 6px ${col})`}, layer);
+    const t0 = performance.now(), dur = 520;
+    const step = t => {
+      const k = Math.min(1, (t - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      c.setAttribute('cx', a.x + (b.x - a.x) * e); c.setAttribute('cy', a.y + (b.y - a.y) * e);
+      if (k < 1) requestAnimationFrame(step); else { c.remove(); res(); }
+    };
+    requestAnimationFrame(step);
+  });
+}
+async function hop(from, to) {
+  const path = pathBetween(from, to);
+  for (let i = 0; i < path.length - 1; i++) await packet(path[i], path[i + 1]);
+}
+
+/* ---------- registry tree ---------- */
+function crewRow(a, d) {
+  return `<li class="crew" data-id="${a.id}" data-status="${status[a.id] || 'idle'}" style="--c:${a.color};--d:${d}">
+    <span class="sw"></span>
+    <div><b>${esc(a.name)}</b><em>${esc(a.role)}</em><p>${esc(a.speciality)}</p>
+      <div class="tags">${a.handles.slice(0, 8).map(h => `<span class="tag">${esc(h)}</span>`).join('')}</div>
+      ${a.plugin ? pluginRow(a) : ''}
+      ${a.id === 'root' ? '' : `<button class="rm" data-rm="${a.id}" type="button">Remove${kids(a.id).length ? ' with team' : ''}</button>`}</div>
+    <span class="st">${status[a.id] || 'idle'}</span></li>`;
+}
+const crewTree = (id, d) => kids(id).map(k => crewRow(k, d) + crewTree(k.id, d + 1)).join('');
+function renderCrew() {
+  $('#crew').innerHTML = crewRow(byId('root'), 0) + crewTree('root', 1);
+  $('#c-agents').textContent = crew.length;
+  $('#c-domains').textContent = kids('root').length;
+  const sel = $('#a-parent'), prev = sel.value;
+  sel.innerHTML = crew.filter(a => a.kind === 'master').map(a => `<option value="${a.id}">${esc(a.name)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+  const isel = $('#i-parent');
+  if (isel) { const p2 = isel.value; isel.innerHTML = sel.innerHTML; if ([...isel.options].some(o => o.value === p2)) isel.value = p2; }
+}
+const removedBuiltin = new Set();
+function persist() {
+  try { localStorage.setItem('ctrl.v2', JSON.stringify({custom: crew.filter(a => !a.builtin), removed: [...removedBuiltin]})); } catch (e) {}
+}
+function loadCustom() {
+  try {
+    let raw = JSON.parse(localStorage.getItem('ctrl.v2') || '{}');
+    if (Array.isArray(raw)) raw = {custom: raw, removed: []};
+    (Array.isArray(raw.removed) ? raw.removed : []).forEach(id => { if (byId(id) && id !== 'root') { subtreeIds(id).forEach(g => { removedBuiltin.add(g); }); crew = crew.filter(a => !subtreeIds(id).includes(a.id)); } });
+    let left = (Array.isArray(raw.custom) ? raw.custom : []).slice(0, 40).filter(a => a && a.id && a.name && a.parent), moved = true;
+    while (left.length && moved) {
+      moved = false;
+      left = left.filter(a => {
+        if (byId(a.parent) && !byId(a.id)) { crew.push({...a, builtin: false, handles: Array.isArray(a.handles) ? a.handles : []}); moved = true; return false; }
+        return true;
+      });
+    }
+  } catch (e) {}
+}
+function restoreDefaults() {
+  BASE.forEach(b => { if (!byId(b.id)) crew.push({...b, handles: [...b.handles]}); });
+  removedBuiltin.clear(); persist(); renderCrew(); renderNet(); renderMission(); log('root', 'Default Social domain restored');
+}
+
+/* ---------- Claude (sample capability) ---------- */
+function parseJSON(t) {
+  const m = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw = m ? m[1] : t;
+  const i = raw.search(/[\[{]/), j = Math.max(raw.lastIndexOf('}'), raw.lastIndexOf(']'));
+  return JSON.parse(raw.slice(i, j + 1));
+}
+async function askText(prompt, tools) {
+  const s = window.claude && window.claude.use ? await window.claude.use('sample') : null;
+  if (!s) throw new Error('unavailable');
+  const opts = {modelTier: 'quick', cache: false};
+  if (tools && tools.length) opts.tools = tools;
+  const r = await Promise.race([s(prompt, opts), new Promise((_, j) => setTimeout(() => j(new Error('timeout')), 90000))]);
+  return (r.text || '').trim();
+}
+async function ask(prompt) {
+  let out = await askText(prompt);
+  try { return parseJSON(out); } catch (e) {
+    out = await askText(prompt + '\n\nYour last answer was not valid JSON. Reply with ONLY the JSON object, nothing else.');
+    return parseJSON(out);
+  }
+}
+
+/* ---------- routing: Root picks a domain, the domain Master picks an agent ---------- */
+const stem = w => w.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/(ing|ed|es|s|e)$/, '');
+const handlesOf = id => [...byId(id).handles, ...kids(id).flatMap(k => handlesOf(k.id))];
+function scoreOf(words, a, hs) {
+  const matched = [...new Set(hs)].filter(h => words.includes(stem(h)));
+  return {a, matched, score: matched.length};
+}
+const bySc = (x, y) => y.score - x.score;
+function routeTask(task) {
+  const words = task.split(/\s+/).map(stem).filter(w => w.length > 2);
+  const doms = kids('root').map(d => scoreOf(words, d, [...handlesOf(d.id), ...d.name.toLowerCase().split(/\s+/)])).sort(bySc);
+  const top = doms[0] && doms[0].score > 0 ? doms[0] : null;
+  const subs = top ? kids(top.a.id).map(w => scoreOf(words, w, handlesOf(w.id))).sort(bySc) : [];
+  return {doms, top, subs, sub: subs[0] && subs[0].score > 0 ? subs[0] : null};
+}
+function barsHTML(list) {
+  const max = Math.max(1, list[0] ? list[0].score : 1);
+  return `<div class="bars">${list.map(x => `<div class="bar" style="--c:${x.a.color}"><span>${esc(x.a.name)}</span><i><s style="width:${Math.round(x.score / max * 100)}%"></s></i><span>${x.score} match${x.score === 1 ? '' : 'es'}</span></div>`).join('')}</div>`;
+}
+async function doRoute(task) {
+  const out = $('#r-out'), r = routeTask(task);
+  log('you', `Task: ${task}`, 'root'); setStatus('root', 'working');
+  await sleep(reduce ? 0 : 250);
+  if (r.top) {
+    const d = r.top.a;
+    let msg = `Root Master routes this to <b style="color:${d.color}">${esc(d.name)}</b> (matched: ${r.top.matched.map(esc).join(', ')}).`;
+    msg += r.sub ? ` ${esc(d.name)} hands it to <b style="color:${r.sub.a.color}">${esc(r.sub.a.name)}</b> (matched: ${r.sub.matched.map(esc).join(', ')}).` : ` ${esc(d.name)} keeps it or splits it across its team.`;
+    out.innerHTML = `<div class="verdict" style="border-color:${d.color}">${msg}</div>${barsHTML(r.doms)}${r.sub ? barsHTML(r.subs) : ''}`;
+    log('root', `Domain: ${d.name} (${r.top.matched.join(', ')})`, d.id);
+    await hop('root', d.id); setStatus(d.id, 'working');
+    if (r.sub) { log(d.id, `Agent: ${r.sub.a.name} (${r.sub.matched.join(', ')})`, r.sub.a.id); await hop(d.id, r.sub.a.id); setStatus(r.sub.a.id, 'working'); }
+    await sleep(reduce ? 0 : 800);
+    const end = r.sub ? r.sub.a.id : d.id;
+    setStatus(end, 'idle'); setStatus(d.id, 'idle');
+    log(end, 'Routing demo finished. Nothing was run or published.', 'root'); await hop(end, 'root');
+  } else {
+    out.innerHTML = `<div class="verdict" style="border-color:var(--warn)">No domain covers this yet. Ask Root Master to create one, or use Create a domain below.</div>${barsHTML(r.doms)}`;
+    log('root', 'No domain matches this task. Suggesting a new domain.', 'you');
+  }
+  setStatus('root', 'idle');
+}
+
+/* ---------- registering agents and domains ---------- */
+async function registerAgent(name, spec, parentId, opts = {}) {
+  const parent = byId(parentId) || byId('root');
+  const isMaster = !!opts.master, withTeam = isMaster && !!opts.team;
+  if (crew.length >= 40) return 'The organization is full at 40 agents.';
+  if (isMaster && kids('root').length >= 8) return 'Root Master already leads 8 domains.';
+  let id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'agent';
+  while (byId(id)) id += '-2';
+  const color = isMaster ? PALETTE[kids('root').filter(a => !a.builtin).length % PALETTE.length] : parent.color;
+  const agent = {id, name, role: isMaster ? 'Domain Master' : 'Specialist', kind: isMaster ? 'master' : 'worker', parent: parent.id, color, builtin: false, speciality: spec, handles: [], accepts: '', returns: ''};
+  const mine = (opts.handles || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  log(parent.id === 'root' ? 'you' : parent.id, `Register ${name}: ${spec}`, parent.id === 'root' ? 'root' : id);
+  setStatus(parent.id, 'working');
+  crew.push(agent); renderCrew(); renderNet(id);
+  await hop(parent.id, id); setStatus(id, 'working');
+  log(parent.id, `Reading the description for ${name}`, id);
+  const teamShape = '{"name":"short name","role":"two or three words","speciality":"one sentence","handles":["6 to 10 lowercase keywords"],"accepts":"one sentence","returns":"one sentence"}';
+  let info = null;
+  try {
+    info = await ask(`You are ${parent.name}, ${parent.role}, in a multi-level agent organization (Root Master > domain Masters > sub-agents). You are registering a new ${isMaster ? 'domain Master that will lead its own team' : 'sub-agent'}.\nName: ${name}\nDescription in the user's words: ${spec}\nReturn ONLY JSON: {"role":"two or three words","handles":["8 to 12 lowercase keywords, one or two words each, that tasks for it would contain"],"accepts":"one sentence: the tasks it takes","returns":"one sentence: what it hands back"${withTeam ? `,"team":[${teamShape}]` : ''}}${withTeam ? '\nPropose 2 or 3 sub-agents that together cover the domain.' : ''}`);
+  } catch (e) { info = null; }
+  let made = [];
+  if (info && Array.isArray(info.handles)) {
+    agent.role = String(info.role || agent.role).slice(0, 28);
+    agent.accepts = String(info.accepts || ''); agent.returns = String(info.returns || '');
+    agent.handles = [...new Set([...mine, ...info.handles.map(h => String(h).toLowerCase().trim()).filter(Boolean)])].slice(0, 12);
+    if (withTeam && Array.isArray(info.team)) {
+      for (const t of info.team.slice(0, 3)) {
+        if (!t || !t.name || crew.length >= 40) continue;
+        let tid = String(t.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'agent';
+        while (byId(tid)) tid += '-2';
+        const w = {id: tid, name: String(t.name).slice(0, 24), role: String(t.role || 'Specialist').slice(0, 28), kind: 'worker', parent: id, color, builtin: false,
+          speciality: String(t.speciality || ''), handles: (Array.isArray(t.handles) ? t.handles : []).map(h => String(h).toLowerCase().trim()).filter(Boolean).slice(0, 10),
+          accepts: String(t.accepts || ''), returns: String(t.returns || '')};
+        crew.push(w); made.push(w); renderCrew(); renderNet(tid);
+        await hop(id, tid); log(id, `Added ${w.name}: ${w.speciality}`, tid);
+      }
+    }
+  } else {
+    const words = spec.toLowerCase().match(/[a-z]{4,}/g) || [];
+    agent.handles = [...new Set([...mine, ...words])].slice(0, 12);
+    agent.accepts = `Tasks about: ${spec}`; agent.returns = 'A result for its Master to pass on.';
+    log(parent.id, 'The model is not available, so handles were taken from your words', id);
+  }
+  await hop(id, parent.id);
+  log(parent.id, `Registered ${name} as ${agent.role}. Handles: ${agent.handles.join(', ')}`, id);
+  setStatus(id, 'idle'); setStatus(parent.id, 'idle');
+  persist(); renderCrew(); selected = id; renderNet();
+  toast(`${name} joined${made.length ? ' with ' + made.length + ' sub-agents' : ''}`);
+  return `Registered ${name} (${agent.role}) under ${parent.name}.` + (made.length ? ` Its team: ${made.map(w => w.name).join(', ')}.` : '');
+}
+function removeAgent(id, opts = {}) {
+  const a = byId(id); if (!a || a.id === 'root' || (a.builtin && !opts.force)) return 0;
+  const gone = subtreeIds(id);
+  gone.forEach(g => { const x = byId(g); if (x && x.builtin) removedBuiltin.add(g); });
+  crew = crew.filter(x => !gone.includes(x.id)); gone.forEach(g => { delete status[g]; delete chats[g]; });
+  if (gone.includes(selected)) selected = 'root';
+  persist(); renderCrew(); renderNet(); renderMission();
+  log('root', `${a.name}${gone.length > 1 ? ' and its team' : ''} removed from the organization`);
+  return gone.length;
+}
+
+/* ---------- mission ---------- */
+const STAGES = [['Scout', 'var(--scout)'], ['Pick', 'var(--master)'], ['Make', 'var(--maker)'], ['Review', 'var(--master)'], ['Post', 'var(--poster)']];
+const STAGE_SUB = ['Scout finds topics, you pick one', 'Your pick decides what Maker builds', 'Maker is building the post', 'You approve before Poster sees it', 'Poster prepares the dispatch', 'Dispatch package ready'];
+function renderRail() {
+  $('#rail').innerHTML = STAGES.map((s, i) => `<li class="${M.stage === i ? 'active' : ''} ${M.stage > i ? 'done' : ''}" style="--c:${s[1]}"><b>${M.stage > i ? '✓' : i + 1}</b><span>${s[0]}</span></li>`).join('');
+  $('#m-sub').textContent = STAGE_SUB[M.stage];
+  $('#c-stage').textContent = M.stage >= 5 ? 'Mission: ready' : M.busy ? `Mission: ${STAGES[M.stage][0].toLowerCase()} working` : M.stage === 0 && !M.topics ? 'Mission: idle' : `Mission: ${STAGES[M.stage][0].toLowerCase()}`;
+}
+const srcBlock = () => `<div class="src">Signals from a web sweep run on ${SWEEP_DATE}. The page cannot browse on its own, so Scout reads this sweep.
+  <ul>${SWEEP.map(s => `<li><a href="${s.url}" target="_blank" rel="noopener">${esc(s.src)}</a> <span style="color:var(--mute)">· ${esc(s.date)}</span></li>`).join('')}</ul></div>`;
+const steps = () => M.progress.length ? `<ul class="steps">${M.progress.map(p => `<li class="${p.done ? 'done' : ''}">${esc(p.t)}</li>`).join('')}</ul>` : '';
+const fullCaption = d => d.caption.trim() + '\n\n' + d.hashtags.join(' ');
+const slug = t => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').split('-').filter(Boolean).slice(0, 5).join('-');
+
+function slideHTML(s, i, n) {
+  const accents = ['var(--scout)', 'var(--maker)', 'var(--poster)', 'var(--master)'];
+  const c = accents[i % accents.length];
+  if (s.kind === 'cover') return `<div class="slide cover" style="--c:${c}"><div class="si"><span class="br">ANALYTUNB</span><h4>${esc(s.headline)}</h4><p>${esc(s.body || 'Swipe')}</p></div></div>`;
+  if (s.kind === 'close') return `<div class="slide" style="--c:${c}"><div class="si"><span class="br">ANALYTUNB</span><h4>${esc(s.headline)}</h4><p>${esc(s.body)}</p></div></div>`;
+  return `<div class="slide" style="--c:${c}"><div class="si"><span class="br">ANALYTUNB</span><span class="n">${String(i).padStart(2, '0')}</span><span class="lb">${esc(s.label || '')}</span><h4>${esc(s.headline)}</h4><p>${esc(s.body)}</p></div></div>`;
+}
+function checksFor(d, t) {
+  const first = d.caption.split('\n')[0], low = first.toLowerCase(), full = fullCaption(d);
+  const hit = t.keywords.some(k => low.includes(k.k.toLowerCase()));
+  return [
+    {ok: full.length <= 2200, t: `Caption is ${full.length} of 2,200 characters`},
+    {ok: first.length > 0 && first.length <= 125, t: `First line is ${first.length} of 125 characters`},
+    {ok: hit, t: 'A target keyword is in the first line'},
+    {ok: d.hashtags.length >= 3 && d.hashtags.length <= 5, t: `${d.hashtags.length} hashtags (3 to 5 works best)`},
+    {ok: d.alt.trim().length > 10, t: 'Alt text is written'},
+    {ok: d.slides.length >= 3 && d.slides.length <= 10, t: `${d.slides.length} slides (3 to 10)`}
+  ];
+}
+function paintChecks() {
+  const t = M.topics[M.pick], cs = checksFor(M.draft, t);
+  $('#checks').innerHTML = cs.map(c => `<li class="${c.ok ? '' : 'bad'}">${esc(c.t)}</li>`).join('');
+  $('#approve').disabled = cs.some(c => !c.ok);
+}
+
+function renderMission() {
+  if (!['master', 'scout', 'maker', 'poster'].every(id => byId(id))) {
+    $('#rail').innerHTML = ''; $('#m-sub').textContent = 'The Social team was removed';
+    $('#mission-body').innerHTML = `<p class="hint" style="margin:0">The Social mission needs Social Master, Trend Scout, Maker and Poster. Root Master removed part of that team.</p><div class="row"><button class="btn" style="--c:var(--master)" data-act="restore">Restore the default Social domain</button></div>`;
+    return;
+  }
+  renderRail();
+  const b = $('#mission-body');
+  if (M.stage === 0) {
+    b.innerHTML = `<label class="lbl" for="niche">Brief for Scout</label>
+      <textarea id="niche" rows="2" ${M.busy ? 'disabled' : ''}>${esc(M.niche)}</textarea>
+      <div class="row"><button class="btn primary" style="--c:var(--scout)" data-act="scout" ${M.busy ? 'disabled' : ''}>${M.busy ? 'Scout is working' : 'Dispatch Scout'}</button>
+      <span class="hint">Master hands Scout the brief, then waits for your pick.</span></div>${steps()}${srcBlock()}`;
+  } else if (M.stage === 1) {
+    b.innerHTML = `<p class="hint" style="margin:0 0 10px">${M.mode === 'claude' ? 'Five topics written by the model from the sweep signals.' : 'Five topics from the built-in set, based on the same sweep.'} Keyword type: broad has high volume, niche is narrower, intent answers a question.</p>
+      <div class="topics">${M.topics.map((t, i) => `<label class="topic ${M.pick === i ? 'on' : ''}"><input type="radio" name="topic" value="${i}" ${M.pick === i ? 'checked' : ''}>
+        <div><b>${esc(t.title)}</b><p>${esc(t.why)}</p>
+        <div class="tags">${t.keywords.map(k => `<span class="tag ${k.type}">${esc(k.k)} <small>${k.type}</small></span>`).join('')}</div>
+        <div class="meta">${t.sources.map(n => `<a href="${SWEEP[n].url}" target="_blank" rel="noopener">${esc(SWEEP[n].src.split(',')[0])}</a>`).join('')}</div></div></label>`).join('')}</div>
+      <div class="banner"><i></i><span>Master is waiting for you. Pick one topic and it goes to Maker.</span></div>
+      <div class="row"><button class="btn primary" style="--c:var(--maker)" data-act="make" id="send" ${M.pick == null ? 'disabled' : ''}>Send to Maker</button>
+      <button class="btn ghost" data-act="rescan">Scan again</button></div>`;
+  } else if (M.stage === 2) {
+    const t = M.topics[M.pick];
+    b.innerHTML = `<p style="margin:0"><b>${esc(t.title)}</b></p><div class="tags" style="margin-top:6px">${t.keywords.map(k => `<span class="tag ${k.type}">${esc(k.k)} <small>${k.type}</small></span>`).join('')}</div>${steps()}`;
+  } else if (M.stage === 3) {
+    const d = M.draft, t = M.topics[M.pick];
+    b.innerHTML = `<p class="hint" style="margin:0 0 8px">Draft for <b style="color:var(--text)">${esc(t.title)}</b>${M.mode === 'claude' ? '' : ' (built-in template, the model was unavailable)'}. Edit anything. Checks update as you type.</p>
+      <div class="reel" aria-label="Slide preview">${d.slides.map((s, i) => slideHTML(s, i, d.slides.length)).join('')}</div>
+      <div class="field"><label class="lbl" for="cap">Caption</label><textarea id="cap" rows="7">${esc(d.caption)}</textarea></div>
+      <div class="field"><label class="lbl" for="tags">Hashtags</label><input type="text" id="tags" value="${esc(d.hashtags.join(' '))}"></div>
+      <div class="field"><label class="lbl" for="alt">Alt text for slide 1</label><textarea id="alt" rows="2">${esc(d.alt)}</textarea></div>
+      <ul class="checks" id="checks"></ul>
+      <div class="row"><button class="btn primary" style="--c:var(--poster)" data-act="approve" id="approve">Approve and hand to Poster</button>
+      <button class="btn ghost" data-act="remake">Rewrite</button><button class="btn ghost" data-act="back-pick">Change topic</button></div>`;
+    paintChecks();
+  } else {
+    const done = M.stage === 5;
+    b.innerHTML = `<div class="field" style="margin-top:0"><span class="lbl">When should Poster send it?</span>
+      <div class="radios" role="radiogroup">
+        ${[['draft', 'Save as draft'], ['now', 'Publish now'], ['schedule', 'Schedule']].map(([v, l]) => `<label><input type="radio" name="timing" value="${v}" ${M.timing === v ? 'checked' : ''} ${done ? 'disabled' : ''}>${l}</label>`).join('')}</div>
+      <div id="when-wrap" style="margin-top:10px" ${M.timing === 'schedule' ? '' : 'hidden'}><label class="lbl" for="when">Toronto time</label><input type="datetime-local" id="when" value="${esc(M.when)}" ${done ? 'disabled' : ''}></div></div>
+      ${done ? '' : `<div class="row"><button class="btn primary" style="--c:var(--poster)" data-act="build">Build dispatch package</button><button class="btn ghost" data-act="back-review">Back to review</button></div>`}
+      ${done ? pkgHTML() : ''}`;
+  }
+}
+function pkgHTML() {
+  return `<div class="pkg"><span class="done-chip">Package ready</span>
+    <p class="hint" style="margin:0">Poster has the package. Use the button below to render the slides and publish from this server, or copy the command for any assistant that can post for you.</p>
+    <label class="lbl" for="cmd">Command for an assistant (optional)</label><textarea id="cmd" rows="8" readonly>${esc(M.pkg.command)}</textarea>
+    <div class="row" style="margin-top:0"><button class="btn primary" style="--c:var(--poster)" data-act="copy-cmd">Copy command</button><button class="btn" style="--c:var(--scout)" data-act="copy-json">Copy JSON</button>${publishBtn()}<button class="btn ghost" data-act="new">New mission</button></div>
+    <div id="pub-out" class="verdict" hidden></div>
+    <details><summary class="hint" style="cursor:pointer">Show the JSON package</summary><pre id="json">${esc(M.pkg.json)}</pre></details></div>`;
+}
+
+/* ---- mission actions ---- */
+function addStep(t) { M.progress.forEach(p => p.done = true); M.progress.push({t, done: false}); renderMission(); }
+
+function scoutPrompt() {
+  const sig = SWEEP.map((s, i) => `[${i}] ${s.src} (${s.date}): ${s.points.join('; ')}`).join('\n');
+  return `You are Trend Scout, a research agent for an Instagram page about: ${M.niche}. Today is ${dateFmt.format(new Date())}.\nSignals gathered from the web (use only these facts, invent nothing):\n${sig}\n\nReturn ONLY JSON: {"topics":[{"title":"max 9 words","why":"one plain sentence grounded in a signal","keywords":[{"k":"keyword phrase","type":"broad|niche|intent"}],"sources":[indexes of the signals used]}]}\nExactly 5 topics, 3 keywords each. Plain language, no hype, no statistics.`;
+}
+function normTopics(r) {
+  const arr = r && (r.topics || r);
+  if (!Array.isArray(arr)) return null;
+  const out = arr.slice(0, 5).map(t => ({
+    title: String(t.title || '').slice(0, 90), why: String(t.why || ''),
+    keywords: (t.keywords || []).slice(0, 3).map(k => ({k: String(k.k || k).toLowerCase(), type: ['broad', 'niche', 'intent', 'local'].includes(k.type) ? k.type : 'niche'})),
+    sources: (t.sources || []).filter(n => Number.isInteger(n) && n >= 0 && n < SWEEP.length), points: null
+  })).filter(t => t.title && t.keywords.length);
+  return out.length >= 3 ? out : null;
+}
+async function runScout() {
+  if (M.busy) return;
+  const nv = $('#niche'); if (nv && nv.value.trim()) M.niche = nv.value.trim();
+  M.busy = true; M.progress = []; M.topics = null; M.pick = null; M.stage = 0; M.n++;
+  setStatus('master', 'working'); renderMission();
+  log('you', `Brief: ${M.niche}`, 'master');
+  await hop('master', 'scout');
+  log('master', 'Task: find topics and keywords, then wait for the user to pick', 'scout'); setStatus('scout', 'working');
+  if (SERVER && SERVER.canSearch) {
+    try {
+      addStep('Searching the web for fresh signals');
+      const live = await ctrl.api('/api/sweep', {brief: M.niche});
+      if (live.sources && live.sources.length) { SWEEP.length = 0; SWEEP.push(...live.sources); SWEEP_DATE = live.date; }
+    } catch (e) { log('scout', `Live search failed, using the built-in sweep: ${e.message}`, 'master'); }
+  }
+  addStep(`Loading the ${SWEEP_DATE} web sweep: ${SWEEP.length} sources, ${sigCount()} signals`);
+  log('scout', `Loaded the web sweep from ${SWEEP_DATE}: ${SWEEP.length} sources, ${sigCount()} signals`);
+  await sleep(reduce ? 0 : 600);
+  addStep('Turning the signals into five topics with keywords');
+  let topics = null; M.mode = 'builtin';
+  try { topics = normTopics(await ask(scoutPrompt())); if (topics) M.mode = 'claude'; } catch (e) { topics = null; }
+  if (!topics) { topics = TOPICS.map(t => ({...t, sources: t.sources.filter(n => n < SWEEP.length)})); log('scout', 'The model is not available, so I am using the built-in topic set', 'master'); }
+  M.topics = topics; M.progress.forEach(p => p.done = true);
+  await hop('scout', 'master');
+  log('scout', `Returned ${topics.length} topics with keywords: ${topics.map(t => t.keywords[0].k).join(', ')}`, 'master');
+  setStatus('scout', 'idle'); setStatus('master', 'waiting');
+  log('master', 'Waiting for you to pick one topic', 'you');
+  M.busy = false; M.stage = 1; renderMission();
+}
+
+function makerPrompt(t) {
+  return `You are Maker, a content agent for the Instagram account @analytunb (AI engineering, practical and plain, almost no emoji).\nTopic: ${t.title}\nWhy it matters: ${t.why}\nKeywords: ${t.keywords.map(k => k.k).join(', ')}\n\nWrite a carousel. Rules: the caption's first line is under 120 characters and contains one of the keywords exactly; the whole caption is under 800 characters in short paragraphs and ends with a question; 4 hashtags that match the keywords; alt text describing slide 1; slides = one cover, three points, one closing slide. Each point has label (1 to 2 words), headline (max 5 words) and body (max 20 words). Use only facts in the topic and why lines. No statistics.\nReturn ONLY JSON: {"caption":"","hashtags":["#"],"alt":"","slides":[{"kind":"cover|point|close","label":"","headline":"","body":""}]}`;
+}
+function normDraft(r) {
+  if (!r || typeof r.caption !== 'string' || !Array.isArray(r.slides) || r.slides.length < 3) return null;
+  const tags = (r.hashtags || []).map(h => String(h).trim()).filter(Boolean).map(h => h.startsWith('#') ? h : '#' + h).slice(0, 5);
+  const slides = r.slides.slice(0, 8).map((s, i, a) => ({kind: i === 0 ? 'cover' : i === a.length - 1 ? 'close' : 'point', label: String(s.label || ''), headline: String(s.headline || ''), body: String(s.body || '')})).filter(s => s.headline);
+  if (slides.length < 3) return null;
+  return {caption: r.caption.replace(/\n?(#\w+\s*)+$/, '').trim(), hashtags: tags, alt: String(r.alt || ''), slides};
+}
+function fallbackDraft(t) {
+  const k = t.keywords, pts = t.points || k.map(x => ({h: cap(x.k), b: t.why}));
+  const first = `${cap(k[0].k)}: ${t.title}.`.slice(0, 120);
+  return {
+    caption: `${first}\n\n${t.why}\n\nSwipe for the three points that matter.\n\nWhich one would you try first?`,
+    hashtags: k.map(x => '#' + x.k.replace(/[^a-z0-9]+/gi, '')).concat(['#AIEngineering']).slice(0, 4),
+    alt: `Carousel cover on a dark background with the title "${t.title}".`,
+    slides: [{kind: 'cover', label: '', headline: t.title, body: 'Swipe'},
+      ...pts.slice(0, 3).map((p, i) => ({kind: 'point', label: k[i] ? k[i].k : '', headline: p.h, body: p.b})),
+      {kind: 'close', label: '', headline: 'Save this for your next build', body: 'Follow @analytunb for AI engineering'}]
+  };
+}
+async function runMaker() {
+  if (M.busy || M.pick == null) return;
+  const t = M.topics[M.pick];
+  M.busy = true; M.stage = 2; M.progress = []; setStatus('master', 'working'); renderMission();
+  log('you', `Picked: ${t.title}`, 'master');
+  await hop('master', 'maker');
+  log('master', `Task: build a carousel and caption. Keywords: ${t.keywords.map(k => k.k).join(', ')}`, 'maker'); setStatus('maker', 'working');
+  addStep('Writing the caption and slide copy');
+  let d = null; M.mode = 'builtin';
+  try { d = normDraft(await ask(makerPrompt(t))); if (d) M.mode = 'claude'; } catch (e) { d = null; }
+  if (!d) { d = fallbackDraft(t); log('maker', 'The model is not available, so I used the built-in template', 'master'); }
+  addStep('Laying out the slides'); await sleep(reduce ? 0 : 500); M.progress.forEach(p => p.done = true);
+  await hop('maker', 'master');
+  log('maker', `Draft ready: ${d.slides.length} slides, ${fullCaption(d).length} characters, ${d.hashtags.length} hashtags`, 'master');
+  setStatus('maker', 'idle'); setStatus('master', 'waiting');
+  log('master', 'Waiting for your review', 'you');
+  M.draft = d; M.busy = false; M.stage = 3; renderMission();
+}
+
+function toronto(local) {
+  for (const off of ['-04:00', '-05:00']) {
+    const d = new Date(local + ':00' + off);
+    if (!isNaN(d) && stampFmt.format(d).replace(' ', 'T') === local) return local + ':00' + off;
+  }
+  return local + ':00-05:00';
+}
+function buildPackage() {
+  const t = M.topics[M.pick], d = M.draft, date = dateFmt.format(new Date()), folder = `posts/${date}-${slug(t.title)}/`;
+  const files = d.slides.map((_, i) => `slide-${i + 1}.png`);
+  let when = null;
+  if (M.timing === 'schedule') {
+    if (!M.when) { toast('Pick a date and time first'); return false; }
+    when = toronto(M.when);
+  }
+  const pkg = {
+    mission: `m-${date}-${M.n || 1}`, account: 'analytunb', platform: 'instagram', format: 'carousel',
+    topic: t.title, keywords: t.keywords.map(k => k.k), caption: fullCaption(d), altText: d.alt,
+    slides: d.slides.map((s, i) => ({n: i + 1, kind: s.kind, label: s.label, headline: s.headline, body: s.body})),
+    media: {repo: 'aishdeep12/insta_posts', folder, files},
+    timing: {mode: M.timing, scheduledTime: when}, approved: true, approvedAt: new Date().toISOString(),
+    sources: t.sources.map(n => SWEEP[n].url)
+  };
+  const timeLine = M.timing === 'now' ? 'Publish now.' : M.timing === 'draft' ? 'Save as a draft, do not publish.' : `Schedule for ${when}.`;
+  const cmd = `Use the instagram-poster skill to post this on analytunb. I have approved the caption and slides. ${timeLine}\n\nMake ${files.length} slides at 1080x1350, host them in aishdeep12/insta_posts under ${folder}, and use these slide texts:\n` +
+    d.slides.map((s, i) => `${i + 1}. [${s.kind}] ${[s.label, s.headline, s.body].filter(Boolean).join(' | ')}`).join('\n') +
+    `\n\nCaption:\n${fullCaption(d)}\n\nAlt text: ${d.alt}`;
+  M.pkg = {json: JSON.stringify(pkg, null, 2), command: cmd};
+  return true;
+}
+async function runPost() {
+  if (!buildPackage()) return;
+  setStatus('master', 'working'); log('you', 'Approved the draft', 'master');
+  await hop('master', 'poster'); setStatus('poster', 'working');
+  log('master', `Task: dispatch the approved package (${M.timing})`, 'poster');
+  log('poster', 'Checked caption, keywords, hashtags, alt text and slide count. Package is ready.');
+  await sleep(reduce ? 0 : 500);
+  await hop('poster', 'master'); setStatus('poster', 'idle'); setStatus('master', 'idle');
+  log('poster', 'Package returned. Use the publish button in the Mission panel.', 'master');
+  M.stage = 5; renderMission(); saveHandoff();
+}
+async function copy(text, ta) {
+  try { await navigator.clipboard.writeText(text); toast('Copied'); }
+  catch (e) { if (ta) { ta.focus(); ta.select(); } toast('Select the text and copy it'); }
+}
+function resetMission() {
+  Object.assign(M, {stage: 0, topics: null, pick: null, draft: null, mode: '', busy: false, progress: [], pkg: null, timing: 'draft', when: ''});
+  setStatus('master', 'idle'); renderMission(); log('master', 'Mission closed. Ready for a new brief.');
+}
+
+/* ---------- self-hosted features: server, publishing, code integration ---------- */
+let SERVER = null;
+const pluginState = {};
+function publishBtn() {
+  return SERVER && SERVER.canPublishUI !== false ? `<button class="btn" style="--c:var(--poster)" data-act="publish">${SERVER.live ? 'Publish to Instagram' : 'Render slides (dry run)'}</button>` : '';
+}
+async function doPublish() {
+  const out = $('#pub-out'); if (!out || !M.pkg) return;
+  out.hidden = false; out.textContent = 'Poster is working...';
+  setStatus('poster', 'working'); log('master', 'Task: render, host and publish the approved package', 'poster'); await hop('master', 'poster');
+  try {
+    const r = await ctrl.api('/api/publish', {package: JSON.parse(M.pkg.json)});
+    out.innerHTML = `<b>${esc(r.mode === 'live' ? 'Published' : 'Dry run done')}.</b> ${esc(r.message)}${r.permalink ? ` <a href="${esc(r.permalink)}" target="_blank" rel="noopener">Open the post</a>` : ''}${r.folder ? `<br><span class="hint">Slides and payload: ${esc(r.folder)}</span>` : ''}`;
+    out.style.borderColor = 'var(--ok)'; log('poster', r.message, 'master');
+  } catch (e) {
+    out.textContent = e.message; out.style.borderColor = 'var(--bad)'; log('poster', `Publish failed: ${e.message}`, 'master');
+  }
+  await hop('poster', 'master'); setStatus('poster', 'idle');
+}
+
+function pluginRow(a) {
+  const st = (pluginState[a.plugin.id] || {}).status || 'missing';
+  const btn = (act, label, color) => `<button class="rm" data-pl="${act}" data-id="${a.id}" type="button"${color ? ` style="color:${color}"` : ''}>${label}</button>`;
+  return `<div class="tags" style="margin-top:6px;align-items:center"><span class="tag ${st === 'approved' ? 'intent' : 'broad'}"><small>${esc(a.plugin.language)} code</small> ${st}</span>` +
+    (st === 'pending' ? btn('review', 'Review and approve', 'var(--poster)') : st === 'approved' ? btn('disable', 'Disable') : '') +
+    (st !== 'missing' ? btn('code', 'View code') : '') + '</div>';
+}
+async function runPlugin(a, text) {
+  try {
+    const r = await ctrl.api('/api/plugins/run', {id: a.plugin.id, task: text, input: text});
+    const out = (r.stdout || '').trim();
+    if (r.exitCode !== 0) return `The code exited with code ${r.exitCode}. ${(r.stderr || '').trim().slice(0, 300)}`;
+    return out || `The code ran and printed nothing. ${(r.stderr || '').trim().slice(0, 200)}`;
+  } catch (e) { return `Code agent error: ${e.message}`; }
+}
+async function showCode(a, withApprove) {
+  const rev = $('#code-review');
+  try {
+    const {code} = await ctrl.api('/api/plugins/code', {id: a.plugin.id});
+    rev.innerHTML = `<div class="sub" style="margin-top:14px">Code for ${esc(a.name)} <span class="hint">(${esc(a.plugin.language)})</span></div><pre>${esc(code)}</pre>` +
+      (withApprove ? `<div class="banner"><i></i><span>Approving lets this code run on your computer with your user's permissions. Approve only if you read it.</span></div><div class="row"><button class="btn primary" style="--c:var(--poster)" data-pl="confirm" data-id="${a.id}" type="button">I read it. Approve and enable</button></div>` : '');
+    $('#code-panel').scrollIntoView({block: 'nearest', behavior: reduce ? 'auto' : 'smooth'});
+  } catch (e) { rev.textContent = e.message; }
+}
+async function refreshPlugins() {
+  try { (await ctrl.api('/api/plugins')).plugins.forEach(p => { pluginState[p.id] = p; }); renderCrew(); } catch (e) {}
+}
+async function pluginAction(act, agentId) {
+  const a = byId(agentId); if (!a || !a.plugin) return;
+  if (act === 'code') return showCode(a, false);
+  if (act === 'review') return showCode(a, true);
+  try {
+    const r = await ctrl.api(act === 'confirm' ? '/api/plugins/approve' : '/api/plugins/disable', {id: a.plugin.id});
+    pluginState[a.plugin.id] = r.plugin; $('#code-review').textContent = '';
+    log('you', `${act === 'confirm' ? 'Approved' : 'Disabled'} the code of ${a.name}`, a.parent); renderCrew(); toast(act === 'confirm' ? `${a.name} can run code now` : `${a.name} disabled`);
+  } catch (e) { toast(e.message); }
+}
+async function registerPluginAgent(m, parentId) {
+  const parent = byId(parentId) || byId('master');
+  let id = m.id; while (byId(id)) id += '-2';
+  const a = {id, name: m.name, role: m.role, kind: 'worker', parent: parent.id, color: parent.color, builtin: false, speciality: m.speciality, handles: m.handles, accepts: m.accepts, returns: m.returns, plugin: {id: m.id, language: m.language}};
+  pluginState[m.id] = m; crew.push(a); persist(); renderCrew(); selected = id; renderNet(id);
+  await hop(parent.id, id);
+  log(parent.id, `Registered ${a.name} as a code agent (${m.language}). Handles: ${a.handles.join(', ')}. Waiting for your approval before it can run.`, id);
+  await hop(id, parent.id);
+}
+$('#code-review').addEventListener('click', e => { const x = e.target.closest('[data-pl]'); if (x) pluginAction(x.dataset.pl, x.dataset.id); });
+$('#i-file').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const rd = new FileReader(); rd.onload = () => { $('#i-code').value = String(rd.result).slice(0, 200000); }; rd.readAsText(f);
+});
+$('#code-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = $('#i-go'), parent = $('#i-parent').value;
+  btn.disabled = true; btn.textContent = 'Master is reading';
+  setStatus(parent, 'working'); log('you', 'Handed code and instructions to Master', parent);
+  try {
+    const fname = ($('#i-file').files[0] || {}).name || '';
+    const {plugin} = await ctrl.api('/api/plugins/draft', {name: $('#i-name').value.trim(), instructions: $('#i-instr').value.trim(), code: $('#i-code').value, filename: fname, adapt: $('#i-adapt').checked, parent});
+    await registerPluginAgent(plugin, parent);
+    $('#code-form').reset();
+    await showCode(byId(crew[crew.length - 1].id), true);
+  } catch (err) { toast(err.message); log(parent, `Could not integrate the code: ${err.message}`, 'you'); }
+  setStatus(parent, 'idle'); btn.disabled = false; btn.textContent = 'Hand to Master';
+});
+if (window.ctrl) ctrl.health.then(h => {
+  if (!h) return;
+  SERVER = h; $('#code-panel').hidden = false;
+  $('#c-model').hidden = false; $('#c-model-t').textContent = `${h.provider}/${h.model}`;
+  renderMission(); refreshPlugins();
+  log('root', `Server connected. Model: ${h.provider}/${h.model}. Live search: ${h.canSearch ? 'on' : 'off'}. Publishing: ${h.live ? 'live' : h.dryRun ? 'dry run' : 'not configured'}.`);
+});
+
+/* ---------- config proposals (Root Master is the entry route; the user approves) ---------- */
+const CFG_KEYS = {
+  LLM_PROVIDER: v => ['ollama', 'openai', 'anthropic', 'mock'].includes(v),
+  LLM_MODEL: v => /^[\w.:\/\-]{1,100}$/.test(v),
+  LLM_BASE_URL: v => v === '' || /^https?:\/\/\S+$/.test(v),
+  SEARCH_PROVIDER: v => ['', 'brave', 'tavily'].includes(v),
+  DRY_RUN: v => ['0', '1'].includes(v),
+  ACCOUNT_HANDLE: v => /^[A-Za-z0-9._]{1,30}$/.test(v)
+};
+const pendingCfg = [];
+function proposeConfig(key, value, reason) {
+  if (!CFG_KEYS[key]) return `${key} cannot be changed from here. Allowed: ${Object.keys(CFG_KEYS).join(', ')}. API keys and tokens are only set in .env.`;
+  if (!CFG_KEYS[key](value)) return `"${value}" is not a valid value for ${key}.`;
+  pendingCfg.push({key, value, reason}); renderCfg();
+  log('root', `Proposed config change: ${key} = ${value || '(empty)'}`, 'you');
+  return 'Proposed. It only applies after the user approves it with the button under the chat.';
+}
+function renderCfg() {
+  const box = $('#cfg-box'); if (!box) return;
+  box.innerHTML = pendingCfg.map((p, i) => `<div class="banner"><i></i><span>Root Master proposes: set <b>${esc(p.key)}</b> to <b>${esc(p.value || '(empty)')}</b>${p.reason ? ' · ' + esc(p.reason) : ''}${p.key === 'DRY_RUN' && p.value === '0' ? ' · This turns on real posting.' : ''}</span></div>` +
+    `<div class="row" style="margin-top:6px"><button class="btn primary" style="--c:var(--poster)" data-cfg="apply" data-i="${i}" type="button">Apply</button><button class="btn ghost" data-cfg="dismiss" data-i="${i}" type="button">Dismiss</button></div>`).join('');
+}
+$('#cfg-box').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cfg]'); if (!b) return;
+  const p = pendingCfg[+b.dataset.i]; if (!p) return;
+  if (b.dataset.cfg === 'apply') {
+    try {
+      SERVER = Object.assign(SERVER || {}, await ctrl.api('/api/config', {key: p.key, value: p.value}));
+      $('#c-model-t').textContent = `${SERVER.provider}/${SERVER.model}`; log('you', `Approved ${p.key} = ${p.value || '(empty)'}`, 'root'); toast('Setting applied'); renderMission();
+    } catch (err) { toast(err.message); return; }
+  }
+  pendingCfg.splice(+b.dataset.i, 1); renderCfg();
+});
+
+/* ---------- handoff ---------- */
+async function saveHandoff() {
+  try {
+    const db = window.claude && window.claude.use ? await window.claude.use('db') : null;
+    if (!db || !M.pkg) return;
+    await db.doc('handoff/latest').set({status: 'approved', savedAt: new Date().toISOString(), package: JSON.parse(M.pkg.json), command: M.pkg.command});
+    toast('Package saved.');
+  } catch (e) {}
+}
+
+/* ---------- agent chat ---------- */
+const chats = {};
+const busyChat = {};
+const CHAT_EX = {
+  root: ['Create a Job Search domain with its own team', 'Ask the Social Master what it is working on'],
+  master: ['Add a sub-agent that writes LinkedIn posts', 'Ask Root Master for a research brief'],
+  scout: ['Focus on small businesses in Toronto', 'What keyword types do you use?'],
+  maker: ['Make the caption more casual', 'Shorten the cover headline'],
+  poster: ['Schedule it for tomorrow at 9am', 'What do you need before you can post?']
+};
+function ensureChat(a) {
+  if (!chats[a.id]) {
+    const team = kids(a.id).map(k => k.name).join(', ');
+    const intro = a.kind === 'root'
+      ? 'I am the Root Master. Describe a new area of work and I will create a domain Master with its own team, or ask me to coordinate between Masters.'
+      : a.kind === 'master'
+        ? `I am ${a.name}. I lead my domain${team ? ' and my team (' + team + ')' : ''}. Give me work, ask me to add a sub-agent or delegate to my team, or have me talk to another Master.`
+        : `I am ${a.name}. ${a.speciality} Tell me what to focus on.`;
+    chats[a.id] = [{who: 'agent', t: intro}];
+  }
+  return chats[a.id];
+}
+function renderChat() {
+  const a = byId(selected) || byId('root'), h = ensureChat(a);
+  $('#chatpanel').style.setProperty('--c', a.color);
+  $('#chat-title').textContent = `Chat with ${a.name}`;
+  $('#chat-in').placeholder = `Type to ${a.name}`;
+  $('#msgs').innerHTML = h.map(m => `<div class='msg ${m.who}' style='--c:${a.color}'><b>${m.who === 'you' ? 'You' : m.who === 'peer' ? 'From ' + esc(m.from) : esc(a.name)}</b><p>${esc(m.t)}</p></div>`).join('') +
+    (busyChat[a.id] ? `<div class='msg agent busy' style='--c:${a.color}'><b>${esc(a.name)}</b><p>working...</p></div>` : '');
+  $('#msgs').scrollTop = $('#msgs').scrollHeight;
+  const ex = CHAT_EX[a.id] || CHAT_EX[a.kind] || ['What can you do?'];
+  $('#chat-ex').innerHTML = ex.map(x => `<button type='button'>${esc(x)}</button>`).join('');
+}
+function chatContext(a) {
+  const dom = domainOf(a.id);
+  if (!dom || dom.id !== 'master') return 'This domain has no fixed mission. Work happens through chat, delegation and messages between agents.';
+  const t = M.topics && M.pick != null ? M.topics[M.pick] : null;
+  return `Social mission. Stage: ${STAGES[Math.min(M.stage, 4)][0]}. Brief: ${M.niche}.` +
+    (t ? ` Chosen topic: ${t.title} (keywords: ${t.keywords.map(k => k.k).join(', ')}).` : ' No topic chosen yet.') +
+    (M.draft ? ` Draft caption: ${M.draft.caption} Hashtags: ${M.draft.hashtags.join(' ')}.` : ' No draft yet.') +
+    ` Timing: ${M.timing}${M.when ? ' ' + M.when : ''}.`;
+}
+const orgSummary = () => kids('root').map(d => `${d.name} (${d.speciality}) with team: ${kids(d.id).map(k => `${k.name} (${k.speciality})`).join('; ') || 'none yet'}`).join(' | ');
+function persona(a) {
+  return `You are ${a.name}, ${a.role}, an agent in Aishdeep's multi-level agent organization. Structure: Root Master > domain Masters > sub-agents.${a.parent ? ' You report to ' + nameOf(a.parent) + '.' : ''} Your speciality: ${a.speciality}\nOrganization: ${orgSummary()}\nState: ${chatContext(a)}\nRules: stay in your speciality and level. Use your tools to act: create domains (Root only), remove or edit agents (Root: any; a Master: its own team only), add sub-agents, delegate work to your team, message other agents. Masters coordinate with each other through message_agent. Root Master is the entry route for changes to the whole system: creating or removing domains, editing or removing any agent, and proposing configuration changes (the user approves those with a button). A domain Master can change only its own team and can never remove or edit itself, another Master or another domain. Reply in 1 to 4 short plain sentences, no markdown, no emoji. You can only draft text and change what your tools allow. You cannot publish, browse the web or change outside systems. Never claim to have posted anything: publishing is a button the user presses in the Mission panel.`;
+}
+function agentByRef(ref) {
+  const r = String(ref || '').toLowerCase().trim();
+  return crew.find(a => a.id === r || a.name.toLowerCase() === r) || (r.length > 2 ? crew.find(a => a.name.toLowerCase().includes(r)) : null);
+}
+function canTalk(a, b) {
+  if (a.id === b.id) return false;
+  const top = x => x.kind === 'root' || x.kind === 'master';
+  if (top(a) && top(b)) return true;
+  const da = domainOf(a.id), db = domainOf(b.id);
+  return !!da && !!db && da.id === db.id;
+}
+async function converse(fromId, toId, text) {
+  const from = byId(fromId), to = byId(toId);
+  if (!from || !to) return 'Unknown agent.';
+  log(fromId, text.slice(0, 160), toId); await hop(fromId, toId); setStatus(toId, 'working');
+  let reply;
+  try { reply = await askText(`${persona(to)}\n\n${from.name} (${from.role}) sends you this message:\n"${text}"\nReply to ${from.name} in 1 to 3 plain sentences. If the request needs work in your area, say what you will do.`); }
+  catch (e) { reply = `${to.name} could not reply because the model is not available.`; }
+  ensureChat(to).push({who: 'peer', from: from.name, t: text}, {who: 'agent', t: reply});
+  ensureChat(from).push({who: 'peer', from: to.name, t: reply});
+  log(toId, reply.slice(0, 160), fromId); await hop(toId, fromId); setStatus(toId, 'idle'); renderChat();
+  return reply;
+}
+async function delegate(from, ref, task) {
+  const w = agentByRef(ref);
+  if (!w || w.id === from.id || !chain(w.id).includes(from.id)) return `${from.name} can only delegate to its own team: ${subtreeIds(from.id).slice(1).map(nameOf).join(', ') || 'none yet'}.`;
+  log(from.id, `Task: ${task.slice(0, 140)}`, w.id); await hop(from.id, w.id); setStatus(w.id, 'working');
+  let out;
+  try { out = w.plugin ? await runPlugin(w, task) : await askText(`${persona(w)}\n\nTask from ${from.name}: ${task}\nProduce the work product as plain text, at most 120 words. You cannot publish or browse the web, so say what you would need for that.`); }
+  catch (e) { out = `${w.name} could not work on this because the model is not available.`; }
+  ensureChat(w).push({who: 'peer', from: from.name, t: task}, {who: 'agent', t: out});
+  log(w.id, `Draft ready: ${out.slice(0, 140)}`, from.id); await hop(w.id, from.id); setStatus(w.id, 'idle'); renderChat();
+  return out.slice(0, 900);
+}
+function toolsFor(a) {
+  const T = [], S = {type: 'string'};
+  const tool = (name, description, props, req, fn) => T.push({name, description, inputSchema: {type: 'object', properties: props, required: req}, execute: fn});
+  tool('message_agent', 'Send a message to another agent and get its reply. Masters can message other Masters, and everyone can message inside their own domain.', {to: S, text: S}, ['to', 'text'], async i => {
+    const b = agentByRef(i.to);
+    if (!b) return 'No such agent. Known: ' + crew.map(x => x.name).join(', ');
+    if (!canTalk(a, b)) return `${a.name} cannot message ${b.name} directly. Go through the Masters.`;
+    return await converse(a.id, b.id, String(i.text || '').slice(0, 500));
+  });
+  if (a.kind === 'root') {
+    tool('create_domain', 'Create a new domain Master (with 2 or 3 sub-agents) for a described area of work. Pick a short name if the user gave none.', {name: S, description: S}, ['name', 'description'], async i => {
+      const n = String(i.name || '').trim().slice(0, 24), d = String(i.description || '').trim();
+      return n && d ? await registerAgent(n, d, 'root', {master: true, team: true}) : 'Need a name and a description.';
+    });
+    tool('route_task', 'Find which domain and agent should handle a task, using the registry keywords.', {task: S}, ['task'], async i => {
+      const r = routeTask(String(i.task || ''));
+      return r.top ? `${r.top.a.name}${r.sub ? ' > ' + r.sub.a.name : ''} (matched: ${r.top.matched.join(', ')})` : 'No domain matches. Suggest creating a new domain.';
+    });
+  }
+  if (a.kind === 'root' || a.kind === 'master') {
+    const inScope = x => a.kind === 'root' ? x.id !== 'root' : (x.id !== a.id && chain(x.id).includes(a.id));
+    const denied = t => `${a.name} is not allowed to change ${t.name}. ` + (a.kind === 'master' ? 'A domain Master can only change agents in its own team, never itself or another domain.' : 'Root Master cannot change itself.');
+    tool('remove_agent', 'Remove an agent and everything under it. Root Master can remove any agent except itself. A domain Master can only remove agents in its own team.', {agent: S}, ['agent'], async i => {
+      const t = agentByRef(i.agent); if (!t) return 'No such agent. Known: ' + crew.map(x => x.name).join(', ');
+      if (!inScope(t)) return denied(t);
+      const n = removeAgent(t.id, {force: true});
+      return n ? `Removed ${t.name}${n > 1 ? ' and ' + (n - 1) + ' agent(s) under it' : ''}.` : `${t.name} could not be removed.`;
+    });
+    tool('update_agent', 'Change an agent: its speciality, role or routing keywords. Same permissions as remove_agent.', {agent: S, speciality: S, role: S, handles: {type: 'array', items: S}}, ['agent'], async i => {
+      const t = agentByRef(i.agent); if (!t) return 'No such agent.';
+      if (!inScope(t)) return denied(t);
+      if (i.speciality) t.speciality = String(i.speciality).slice(0, 240);
+      if (i.role) t.role = String(i.role).slice(0, 28);
+      if (Array.isArray(i.handles) && i.handles.length) t.handles = i.handles.map(h => String(h).toLowerCase().trim()).filter(Boolean).slice(0, 12);
+      persist(); renderCrew(); renderNet(); log(a.id, `Updated ${t.name}`, t.id);
+      return `Updated ${t.name}.`;
+    });
+  }
+  if (a.kind === 'master') {
+    tool('add_agent', 'Add a new sub-agent to your own team from a described functionality. Pick a short name if the user gave none.', {name: S, description: S}, ['name', 'description'], async i => {
+      const n = String(i.name || '').trim().slice(0, 24), d = String(i.description || '').trim();
+      return n && d ? await registerAgent(n, d, a.id, {}) : 'Need a name and a description.';
+    });
+    tool('delegate', 'Give a task to one of the agents in your team and get its draft work product back.', {agent: S, task: S}, ['agent', 'task'], async i => await delegate(a, i.agent, String(i.task || '').slice(0, 600)));
+  }
+  if (a.id === 'master') tool('start_mission', 'Start the Instagram mission: set the brief and dispatch Trend Scout. The user then picks a topic in the Mission panel.', {brief: S}, ['brief'], async i => {
+    if (M.busy) return 'Scout is already working.';
+    M.niche = String(i.brief || M.niche).slice(0, 300); runScout();
+    return 'Scout dispatched. Topics will appear in the Mission panel for the user to pick.';
+  });
+  if (a.id === 'scout') tool('set_brief', 'Change the brief Scout searches for.', {brief: S}, ['brief'], async i => {
+    M.niche = String(i.brief || '').slice(0, 300); const n = $('#niche'); if (n) n.value = M.niche;
+    return 'Brief updated. The user dispatches Scout from the Mission panel to rescan with it.';
+  });
+  if (a.id === 'maker') {
+    tool('set_caption', 'Replace the draft caption (no hashtags in it).', {caption: S}, ['caption'], async i => {
+      if (!M.draft) return 'There is no draft yet. A topic must be picked and sent to Maker first.';
+      M.draft.caption = String(i.caption || '').trim(); if (M.stage === 3) renderMission(); return 'Caption updated in the review panel.';
+    });
+    tool('set_hashtags', 'Replace the draft hashtags (3 to 5).', {hashtags: {type: 'array', items: S}}, ['hashtags'], async i => {
+      if (!M.draft) return 'There is no draft yet.';
+      M.draft.hashtags = (i.hashtags || []).map(h => String(h).trim()).filter(Boolean).map(h => h.startsWith('#') ? h : '#' + h).slice(0, 5);
+      if (M.stage === 3) renderMission(); return 'Hashtags updated.';
+    });
+  }
+  if (a.id === 'poster') tool('set_timing', 'Set when the post goes out. mode is draft, now or schedule. when is Toronto local time as YYYY-MM-DDTHH:MM, only for schedule.', {mode: S, when: S}, ['mode'], async i => {
+    if (!['draft', 'now', 'schedule'].includes(i.mode)) return 'mode must be draft, now or schedule.';
+    M.timing = i.mode; if (i.when) M.when = String(i.when).slice(0, 16);
+    if (M.stage === 4) renderMission(); return 'Timing set.';
+  });
+  if (a.kind === 'root' && SERVER) tool('propose_config', 'Propose a change to the system configuration. The user must approve it with a button before it applies. Allowed keys: LLM_PROVIDER (ollama, openai, anthropic, mock), LLM_MODEL, LLM_BASE_URL, SEARCH_PROVIDER (brave, tavily or empty), DRY_RUN (0 or 1), ACCOUNT_HANDLE. API keys and tokens cannot be changed here.', {key: S, value: S, reason: S}, ['key', 'value'], async i => proposeConfig(String(i.key), String(i.value ?? ''), String(i.reason || '')));
+  if (a.plugin) tool('run_code', 'Run your code with an input and return its output.', {input: S}, ['input'], async i => await runPlugin(a, String(i.input || '')));
+  return T;
+}
+async function sendChat(text) {
+  const a = byId(selected) || byId('root');
+  if (busyChat[a.id] || !text) return;
+  const h = ensureChat(a);
+  h.push({who: 'you', t: text}); busyChat[a.id] = true; renderChat();
+  log('you', text, a.id); setStatus(a.id, 'working');
+  const hist = h.slice(-12).map(m => `${m.who === 'you' ? 'User' : m.who === 'peer' ? m.from : a.name}: ${m.t}`).join('\n');
+  let reply;
+  try { reply = (await askText(`${persona(a)}\n\nConversation:\n${hist}\n\nReply as ${a.name}.`, toolsFor(a))) || 'Done.'; }
+  catch (e) { reply = 'The model did not answer. Check that your model server is running and the settings in .env are right. The forms still work.'; }
+  h.push({who: 'agent', t: reply}); busyChat[a.id] = false;
+  log(a.id, reply.slice(0, 140), 'you'); setStatus(a.id, 'idle'); renderChat();
+}
+
+/* ---------- wiring ---------- */
+$('#mission-body').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.dataset.act;
+  if (a === 'scout' || a === 'rescan') runScout();
+  else if (a === 'make' || a === 'remake') runMaker();
+  else if (a === 'back-pick') { M.stage = 1; setStatus('master', 'waiting'); renderMission(); }
+  else if (a === 'approve') { M.stage = 4; M.when = M.when || `${dateFmt.format(new Date(Date.now() + 864e5))}T09:00`; log('you', 'Draft approved', 'master'); renderMission(); }
+  else if (a === 'back-review') { M.stage = 3; renderMission(); }
+  else if (a === 'build') runPost();
+  else if (a === 'copy-cmd') copy(M.pkg.command, $('#cmd'));
+  else if (a === 'copy-json') copy(M.pkg.json, null);
+  else if (a === 'restore') restoreDefaults();
+  else if (a === 'new') resetMission();
+  else if (a === 'publish') doPublish();
+});
+$('#mission-body').addEventListener('change', e => {
+  if (e.target.name === 'topic') {
+    M.pick = +e.target.value;
+    $$('.topic').forEach((l, i) => l.classList.toggle('on', i === M.pick));
+    $('#send').disabled = false;
+  } else if (e.target.name === 'timing') {
+    M.timing = e.target.value; $('#when-wrap').hidden = M.timing !== 'schedule';
+  } else if (e.target.id === 'when') M.when = e.target.value;
+});
+$('#mission-body').addEventListener('input', e => {
+  if (!M.draft || M.stage !== 3) return;
+  if (e.target.id === 'cap') M.draft.caption = e.target.value;
+  else if (e.target.id === 'tags') M.draft.hashtags = e.target.value.split(/\s+/).filter(Boolean).map(h => h.startsWith('#') ? h : '#' + h);
+  else if (e.target.id === 'alt') M.draft.alt = e.target.value;
+  else return;
+  paintChecks();
+});
+$('#crew').addEventListener('click', e => {
+  const pl = e.target.closest('[data-pl]'); if (pl) { pluginAction(pl.dataset.pl, pl.dataset.id); return; }
+  const r = e.target.closest('[data-rm]');
+  if (r) {
+    if (r.dataset.armed !== '1') {
+      r.dataset.armed = '1'; r.textContent = 'Click again to confirm';
+      setTimeout(() => { if (r.isConnected) { r.dataset.armed = ''; r.textContent = 'Remove'; } }, 3000);
+    } else removeAgent(r.dataset.rm, {force: true});
+    return;
+  }
+  const row = e.target.closest('.crew');
+  if (row) { selected = row.dataset.id; renderSel(); $$('.node').forEach(n => n.classList.toggle('sel', n.dataset.id === selected)); }
+});
+$('#route').addEventListener('submit', e => { e.preventDefault(); const v = $('#r-task').value.trim(); if (v) doRoute(v); });
+async function guarded(btn, label, fn) {
+  btn.disabled = true; btn.textContent = 'Working';
+  try { await fn(); } finally { btn.disabled = false; btn.textContent = label; }
+}
+$('#dom').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = $('#d-name').value.trim(), s = $('#d-spec').value.trim();
+  if (!n || !s) return;
+  guarded($('#d-go'), 'Create domain', async () => { const r = await registerAgent(n, s, 'root', {master: true, team: true}); if (/^(The|Root)/.test(r)) toast(r); else $('#dom').reset(); });
+});
+$('#add').addEventListener('submit', e => {
+  e.preventDefault();
+  const n = $('#a-name').value.trim(), s = $('#a-spec').value.trim(), p = $('#a-parent').value;
+  if (!n || !s) return;
+  guarded($('#a-go'), 'Register agent', async () => { const r = await registerAgent(n, s, p, {handles: $('#a-handles').value}); if (/^The /.test(r)) toast(r); else $('#add').reset(); });
+});
+$('#chat-form').addEventListener('submit', e => { e.preventDefault(); const i = $('#chat-in'), v = i.value.trim(); if (!v) return; i.value = ''; sendChat(v); });
+$('#chat-ex').addEventListener('click', e => { const b = e.target.closest('button'); if (b) sendChat(b.textContent); });
+const EX = ['find trending keywords', 'design a carousel about agents', 'schedule a post for tomorrow', 'track my job applications'];
+$('#r-ex').innerHTML = EX.map(x => `<button type="button">${esc(x)}</button>`).join('');
+$('#r-ex').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { $('#r-task').value = b.textContent; doRoute(b.textContent); } });
+
+[['control', 'blueprint'], ['blueprint', 'control']].forEach(([a, o]) => {
+  $('#tab-' + a).addEventListener('click', () => {
+    $('#tab-' + a).setAttribute('aria-selected', 'true'); $('#tab-' + o).setAttribute('aria-selected', 'false');
+    $('#view-' + a).hidden = false; $('#view-' + o).hidden = true;
+  });
+});
+
+setInterval(() => { $('#clock').textContent = timeFmt.format(new Date()); }, 1000);
+$('#clock').textContent = timeFmt.format(new Date());
+
+loadCustom();
+crew.forEach(a => status[a.id] = 'idle');
+renderCrew(); renderNet(); renderMission();
+log('root', `Organization loaded: ${kids('root').length} domain(s), ${crew.length} agents`);
+log('root', 'Ready. Chat with any agent, create a domain, or start the Social mission.');
+})();
+</script>
